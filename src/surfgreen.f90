@@ -4,7 +4,7 @@
 ! History:
 !         by Quan Sheng Wu on Oct/17/2012                                !
 !+---------+---------+---------+---------+---------+---------+--------+!
-  subroutine surfgreen_1985(omega,GLL,GRR,GB,H00,H01,ones, eta_broadening)
+  subroutine surfgreen_1985(omega,GLL,GRR,GB,H00,H01,ones)
      use para
      implicit none
 
@@ -12,7 +12,6 @@
      ! the factor 2 is induced by spin
      ! energy hbar omega
      real(Dp),intent(in) :: omega  
-     real(Dp),intent(in) :: eta_broadening
 
      ! H00 Hamiltonian between nearest neighbour-quintuple-layers
      complex(Dp),intent(in) :: H00(Ndim,Ndim)
@@ -44,7 +43,7 @@
      ! a real type temp variable
      real(Dp) :: real_temp
 
-     ! omegac=omega(i)+I * Fermi_broadening
+     ! omegac=omega(i)+I * eta
      complex(Dp) :: omegac 
 
 
@@ -79,7 +78,7 @@
     !print *, sqrt(sum(abs(H00)**2)), 'H00'
 
      ! w+i*0^+
-     omegac= dcmplx(omega, eta_broadening)
+     omegac= dcmplx(omega, eta)
     !print *, omegac
 
      ! begin iteration
@@ -147,7 +146,7 @@
 !            mpi version      4/21/2010
 !            little change to cpu version in Zurich Swiss Jan 25 2015
 !+---------+---------+---------+---------+---------+---------+--------+!
-  subroutine surfgreen_1984(omega,GLL,GRR,H00,H01,ones, eta_broadening)
+  subroutine surfgreen_1984(omega,GLL,GRR,H00,H01,ones)
 
      use wmpi
      use para
@@ -175,7 +174,7 @@
      ! frequency 
      real(Dp),intent(in) :: omega
 
-     ! energy energy=omega(i)+I * Fermi_broadening
+     ! energy energy=omega(i)+I * eta
      complex(Dp) :: energy
 
      ! surface green fuction  an output variable
@@ -191,9 +190,6 @@
 
      ! unit matrix ones
      complex(Dp),intent(in)  :: ones(Ndim,Ndim)
-
-     !> infinite small value broadening
-     real(dp), intent(in) :: eta_broadening
 
      complex(Dp),allocatable  :: H01dag(:,:)
 
@@ -256,7 +252,7 @@
         enddo
      enddo
 
-     energy=omega+zi*eta_broadening
+     energy=omega+zi*eta
      temp=energy*ones-H00
 
 

@@ -19,10 +19,10 @@
      complex(Dp),intent(out) ::Hamk_slab(Num_wann*nslab,Num_wann*nslab) 
 
      ! the factor 2 is induced by spin
-     complex(Dp), allocatable :: Hij(:, :, :), ham_elec(:, :), Sij(:, :, :), Sk_slab(:, :)
+     complex(Dp), allocatable :: Hij(:, :, :)
 
      allocate( Hij(-ijmax:ijmax,Num_wann,Num_wann))
-     allocate( ham_elec( Num_wann*nslab, Num_wann*nslab))
+
 
      !> deal with phonon system
      if (index(Particle,'phonon')/=0.and.LOTO_correction) then
@@ -45,28 +45,6 @@
         enddo ! i2
      enddo ! i1
 
-     if (.not. Orthogonal_Basis) then
-         stop 'ERROR: slab system not support orthogonal basis yet'
-         allocate(Sij(-ijmax:ijmax,Num_wann,Num_wann))
-         allocate(Sk_slab(Num_wann*nslab,Num_wann*nslab))
-         Sk_slab=0.0d0
-         
-         call s_qlayer2qlayer2(k,Sij)
-         do i1=1, nslab
-            do i2=1, nslab
-               if (abs(i2-i1).le.ijmax)then
-                  Sk_slab((i2-1)*Num_wann+1:(i2-1)*Num_wann+Num_wann,&
-                         (i1-1)*Num_wann+1:(i1-1)*Num_wann+Num_wann )&
-                  = Sij(i1-i2,1:Num_wann,1:Num_wann)
-               endif 
-            enddo ! i2
-         enddo ! i1
-         call orthogonalize_hamiltonian(Hamk_slab, Sk_slab,Num_wann*nslab)
-     endif
-
-     call add_ham_slab_elec_field(ham_elec)
-     Hamk_slab= Hamk_slab+ ham_elec 
-
      ! check hermitcity
 
      do i1=1,nslab*Num_wann
@@ -79,9 +57,6 @@
      enddo
 
      deallocate( Hij)
-     if (.not. Orthogonal_Basis) then
-        deallocate(Sij)
-     endif
   return
   end subroutine ham_slab
 
@@ -130,9 +105,10 @@ subroutine ham_slab_sparseHR(nnzmax, k, acoo,jcoo,icoo)
 
          !> sum over R points to get H(k1, k2)
          do ims=1,splen
-            ia= hirv(1, ims)
-            ib= hirv(2, ims)
-            ic= hirv(3, ims)
+            ir=hirv(ims)
+            ia=irvec(1,iR)
+            ib=irvec(2,iR)
+            ic=irvec(3,iR)
 
             !> new lattice
             call latticetransform(ia, ib, ic, new_ia, new_ib, new_ic)
@@ -336,73 +312,3 @@ end subroutine ham_slab_sparseHR
   return
   end subroutine ham_slab_parallel_B
 
-  subroutine add_ham_slab_elec_field(ham_elec)
-
-     !> add a perpendicular electric field to the slab system
-     use para
-     implicit none
-
-     complex(dp), intent(out) :: ham_elec(nslab*Num_wann, nslab*Num_wann)
-
-     !> first we need to check the center of the slab such that where the static potential is zero
-     integer :: i, j, it, ia, io
-     real(dp) :: angle_t, ratio, len_r12_cross, static_potential
-     real(dp) :: R1(3), R2(3), R3(3), R3_slab(3), R12_cross(3), center(3)
-     real(dp), allocatable :: pos_cart(:), pos_z(:)
-     integer :: Num_atoms_slab, num_atoms_primitive_cell
-     real(dp), external :: norm, angle
-  
-     R1=Cell_defined_by_surface%Rua
-     R2=Cell_defined_by_surface%Rub
-     R3=Cell_defined_by_surface%Ruc
-  
-     !> R12_cross=R1xR2
-     call cross_product(R1, R2, R12_cross)
-     len_r12_cross= norm(R12_cross)
-  
-     !> angle of R12_cross and R3
-     angle_t= angle (R12_cross, R3)
-     angle_t= angle_t*pi/180d0
-  
-     ratio= Vacuum_thickness_in_Angstrom/cos(angle_t)/norm(R3)
-  
-     R3_slab= (Nslab+ ratio)*R3
-  
-  
-     num_atoms_primitive_cell= Cell_defined_by_surface%Num_atoms
-     Num_atoms_slab= Cell_defined_by_surface%Num_atoms*Nslab
-  
-     allocate(pos_cart(3))
-     allocate(pos_z(Num_atoms_slab))
-     pos_cart=0d0
-     pos_z= 0
-  
-     it= 0
-     do ia=1, num_atoms_primitive_cell
-        do i=1, Nslab
-           it=it+1
-           pos_cart(:)= Cell_defined_by_surface%Atom_position_cart(:, ia)+ R3*(i-1d0+ratio/2d0)
-           pos_z(it)= dot_product(R12_cross, pos_cart)/len_r12_cross
-        enddo
-     enddo
-     pos_z= pos_z- sum(pos_z(:))/Num_atoms_slab
-
-     it= 0
-     io= 0
-     ham_elec= 0d0
-     do i=1, Nslab 
-        do ia=1, num_atoms_primitive_cell
-           it= it+ 1
-           static_potential= pos_z(it)*Electric_field_in_eVpA*eV2Hartree/Angstrom2atomic
-           do j=1, Origin_cell%nprojs(ia)
-              io= io+ 1
-              ham_elec(io, io)= static_potential
-              if (SOC>0) then
-                 ham_elec(io+Nslab*Num_wann/2, io+Nslab*Num_wann/2)= static_potential
-              endif
-           enddo
-        enddo
-     enddo
-
-     return
-  end subroutine add_ham_slab_elec_field

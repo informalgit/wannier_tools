@@ -6,8 +6,6 @@ subroutine unfolding_kpath
    !> Implemented by QSWU 2019
    use para
    use sparse
-   use me_calculate
-
    implicit none
 
    real(dp), allocatable :: omega(:), eta_array(:)
@@ -83,9 +81,7 @@ subroutine unfolding_kpath
       enddo
    endif
 
-  
-
-   sigma=(1d0,0d0)*iso_energy
+   sigma=(1d0,0d0)*E_arc
    if (Is_Sparse_Hr) then
       if (NumSelectedEigenVals==0) NumSelectedEigenVals=OmegaNum
       neval=NumSelectedEigenVals
@@ -125,7 +121,7 @@ subroutine unfolding_kpath
    NumberofEta=9
    allocate(eta_array(NumberofEta))
    eta_array=(/0.1d0, 0.2d0, 0.4d0, 0.8d0, 1.0d0, 2d0, 4d0, 8d0, 10d0/)
-   eta_array= eta_array*Fermi_broadening
+   eta_array= eta_array*Eta_Arc
 
    allocate(omega(omeganum_unfold))
    omega= 0d0
@@ -136,7 +132,7 @@ subroutine unfolding_kpath
    !> first unfold the kpoints from the kpath of the supercell
    do ik= 1+cpuid, nk3_band, num_cpu
       if (cpuid==0) write(stdout, '(a, i10," /", i10)') 'BulkBand unfolding at :', ik, nk3_band
-      k_PBZ_direct= kpath_3d(:, ik)
+      k_PBZ_direct= k3points(:, ik)
       call direct_cart_rec_unfold(k_PBZ_direct, k_cart)
       if (Landaulevel_unfold_line_calc) then 
          call cart_direct_rec_magneticcell(k_cart, k_PBZ_direct_in_SBZ)
@@ -157,7 +153,7 @@ subroutine unfolding_kpath
          if (nvecs<50) nvecs= 50
          if (nvecs>Ndimq) nvecs= Ndimq
          
-         sigma=(1d0,0d0)*iso_energy
+         sigma=(1d0,0d0)*E_arc
 
          if (allocated(zeigv)) deallocate(zeigv)
          if (allocated(psi)) deallocate(psi)
@@ -180,7 +176,9 @@ subroutine unfolding_kpath
             W= 0d0
             !> after arpack_sparse_coo_eigs, nnz will be updated.
             ritzvec= .true.
+#if defined (INTELMKL)
             call arpack_sparse_coo_eigs(Ndimq,nnzmax,nnz,acoo,jcoo,icoo,neval,nvecs,W,sigma, zeigv, ritzvec)
+#endif
          else
             call ham_3Dlandau(Ndimq, Magq, k_SBZ_direct, hamk_bulk)
             zeigv=hamk_bulk
@@ -199,7 +197,9 @@ subroutine unfolding_kpath
             W= 0d0
             !> after arpack_sparse_coo_eigs, nnz will be updated.
             ritzvec= .true.
+#if defined (INTELMKL)
             call arpack_sparse_coo_eigs(Num_wann,nnzmax,nnz,acoo,jcoo,icoo,neval,nvecs,W,sigma, zeigv, ritzvec)
+#endif
             call now(time3)
          else
             ! dense hr
@@ -215,7 +215,6 @@ subroutine unfolding_kpath
 
       do n= 1, neval
          psi= zeigv(:, n)
-         k_cart_abs = sqrt(W(n) + photon_energy_arpes)
          if (Landaulevel_unfold_line_calc) then
             call get_projection_weight_bulk_unfold(Ndimq, k_SBZ_direct, k_PBZ_direct, psi, weight, Magnetic_cell, &
               NumberofSelectedOrbitals_groups_local, NumberofSelectedOrbitals_local, Selected_WannierOrbitals_local)
@@ -323,11 +322,10 @@ end subroutine unfolding_kpath
 
 subroutine unfolding_kplane
    !> Unfold the energy bands of the supercell to a specified unit cell.
-   !> Calculate unfolded band at (k1, k2) at a given energy iso_energy.
+   !> Calculate unfolded band at (k1, k2) at a given energy E_arc.
    !> Implemented by QSWU 2019
    use para
    use sparse
-   use me_calculate
    implicit none
 
    real(dp), allocatable :: eta_array(:)
@@ -411,9 +409,8 @@ subroutine unfolding_kplane
       enddo
    enddo
 
-   k_cart_abs = sqrt(iso_energy+ photon_energy_arpes)
 
-   sigma=(1d0,0d0)*iso_energy
+   sigma=(1d0,0d0)*E_arc
    if (Is_Sparse_Hr) then
 
       if (NumSelectedEigenVals==0) then
@@ -458,7 +455,7 @@ subroutine unfolding_kplane
    NumberofEta=9
    allocate(eta_array(NumberofEta))
    eta_array=(/0.1d0, 0.2d0, 0.4d0, 0.8d0, 1.0d0, 2d0, 4d0, 8d0, 10d0/)
-   eta_array= eta_array*Fermi_broadening
+   eta_array= eta_array*Eta_Arc
 
    !> first unfold the kpoints from the kpath of the supercell
    do ik= 1+cpuid, knv3, num_cpu
@@ -493,7 +490,9 @@ subroutine unfolding_kplane
          W= 0d0
          !> after arpack_sparse_coo_eigs, nnz will be updated.
          ritzvec= .true.
+#if defined (INTELMKL)
          call arpack_sparse_coo_eigs(Num_wann,nnzmax,nnz,acoo,jcoo,icoo,neval,nvecs,W,sigma, zeigv, ritzvec)
+#endif
          call now(time3)
       else
  
@@ -506,7 +505,9 @@ subroutine unfolding_kplane
             W= 0d0
             !> after arpack_sparse_coo_eigs, nnz will be updated.
             ritzvec= .true.
+#if defined (INTELMKL)
             call arpack_sparse_coo_eigs(Num_wann,nnzmax,nnz,acoo,jcoo,icoo,neval,nvecs,W,sigma, zeigv, ritzvec)
+#endif
             call now(time3)
          else
             ! dense hr
@@ -521,13 +522,12 @@ subroutine unfolding_kplane
 
       do n= 1, neval
          psi= zeigv(:, n)
-         
          call get_projection_weight_bulk_unfold(Num_wann, k_SBZ_direct, k_PBZ_direct, psi, weight, Origin_cell, &
               NumberofSelectedOrbitals_groups, NumberofSelectedOrbitals, Selected_WannierOrbitals)
          do ig=1, NumberofSelectedOrbitals_groups
             do ieta= 1, NumberofEta
                spectrum_unfold(ieta, ig, ik1, ik2)= spectrum_unfold(ieta, ig, ik1, ik2) + &
-                  weight(ig)*delta(eta_array(ieta), W(n)-iso_energy)
+                  weight(ig)*delta(eta_array(ieta), W(n)-E_arc)
             enddo ! ieta
          enddo ! ig
       enddo ! sum over n
@@ -691,9 +691,7 @@ subroutine get_projection_weight_bulk_unfold(ndim, k_SBZ_direct, k_PBZ_direct, p
    !> Implemented by QSWU 2019
    use para, only : dp, projection_weight_mode, &
       cpuid, stdout, Nrpts, irvec, global_shift_SC_to_PC_cart, &
-      Folded_cell, eps3, cell_type, int_array1D, Landaulevel_unfold_line_calc, twopi, zi, Matrix_Element_calc, SOC!@
-
-   use me_calculate !@ use "!@" to mark the place modified by ycshen
+      Folded_cell, eps3, cell_type, int_array1D, Landaulevel_unfold_line_calc, twopi, zi
    implicit none
 
    integer, intent(in) :: ndim
@@ -718,11 +716,9 @@ subroutine get_projection_weight_bulk_unfold(ndim, k_SBZ_direct, k_PBZ_direct, p
    real(dp) :: posi_cart(3), posi_direct(3), posi_direct_unfold(3)
    real(dp) :: tau_i_tilde(3), tau_j_tilde(3), dij_tilde_cart(3), dij_tilde_direct(3)
    real(dp) :: k_cart(3), k_SBZ_direct_in_PBZ(3), k_t(3), k_t2(3), k_PBZ_direct_in_SBZ(3)
-   real(dp) :: kdotr, k_abs         
+   real(dp) :: kdotr        
    complex(dp) :: overlp, overlp_matrix_element
-   character(10) :: atom_name_PC, atom_name_SC, projector_name_PC
-   complex(dp) :: me !@ matrix element
-   complex(dp), allocatable :: me_values(:)!@ matrix element values
+   character(10) :: atom_name_PC, atom_name_SC
 
    !> delta function
    real(dp), external :: delta, norm
@@ -754,45 +750,12 @@ subroutine get_projection_weight_bulk_unfold(ndim, k_SBZ_direct, k_PBZ_direct, p
    endif
    call cart_direct_rec_unfold(k_cart, k_SBZ_direct_in_PBZ)
 
-   !@ let k_cart be the transformation of k_PBZ, not the k_SPZ in the first brillouin zone
-   call direct_cart_rec_unfold(k_PBZ_direct, k_cart)
-
    weight= 0d0
 
    !> k_t is in unit of the reciprocal lattice vector of the primitive unit cell (Folded_cell).
    k_t=k_PBZ_direct-k_SBZ_direct_in_PBZ
 
-   allocate(me_values(Folded_cell%NumberofSpinOrbitals))
 
-   if ( Matrix_Element_calc .eqv. .True. ) then
-      !@ k_abs is the k_f(3) considering the photon energy
-      if ( (k_cart_abs**2 - k_cart(1)**2 - k_cart(2)**2 ) .le. 0 ) then
-         weight = 0
-         return
-      end if
-      k_abs = sqrt(k_cart_abs**2 - k_cart(1)**2 - k_cart(2)**2)
-      
-      
-   
-     
-    
-         !@ calculate the matrix element for each spinorbital
-         do io_PC=1, Folded_cell%NumberofSpinOrbitals
-      
-            atom_name_PC= adjustl(trim(Folded_cell%atom_name(Folded_cell%spinorbital_to_atom_index(io_PC))))
-            projector_PC= Folded_cell%spinorbital_to_projector_index(io_PC)
-   
-            projector_name_PC= adjustl(trim(Folded_cell%proj_name(Folded_cell%spinorbital_to_projector_index(io_PC), Folded_cell%spinorbital_to_atom_index(io_PC))))
-            me = 0d0 !! initialize the variable
-            call get_matrix_element(atom_name_PC, projector_name_PC, k_cart, Folded_cell%wannier_centers_direct(:, io_PC), me)
-            me_values(io_PC) = me
-            
-         enddo ! io_PC
-   
-      
-   end if
-
-   
    do ig=1, NumberofSelectedOrbitals_groups
       overlp_matrix_element=0d0
       do io_PC=1, Folded_cell%NumberofSpinOrbitals
@@ -826,23 +789,10 @@ subroutine get_projection_weight_bulk_unfold(ndim, k_SBZ_direct, k_PBZ_direct, p
                icount=icount+ 1
             endif
 
-            !@ make sure the spin part can get match
-
-            if (SOC > 0) then
-               if ((io_PC-Folded_cell%NumberofSpinOrbitals/2d0 > 0) .neqv. (io_SC-origincell%NumberofSpinOrbitals/2d0 > 0) ) then
-                  cycle
-               endif
-            end if
-
-            
             !> brodening is 0.2 Bohr
             overlp= overlp+ delta(0.2d0, norm(dij_tilde_cart))*(cos(twopi*kdotr)-zi*sin(twopi*kdotr))*psi(io_SC)/delta(0.2d0, 0d0)
-            
-            overlp_matrix_element= overlp_matrix_element+ delta(0.2d0, norm(dij_tilde_cart))*(cos(twopi*kdotr)-zi*sin(twopi*kdotr))*psi(io_SC)/delta(0.2d0, 0d0)*me_values(io_PC)&
-            *(cos((k_abs-k_cart(3))*posi_cart(3))+zi*sin((k_abs-k_cart(3))*posi_cart(3)))&
-            *exp(-(posi_cart(3)/penetration_lambda_arpes))
-            
-            
+            overlp_matrix_element= overlp_matrix_element+ delta(0.2d0, norm(dij_tilde_cart))*(cos(twopi*kdotr)-zi*sin(twopi*kdotr))*psi(io_SC)/delta(0.2d0, 0d0)
+
          enddo ! io
          weight(ig)= weight(ig)+ abs(overlp)**2/NumberofSelectedOrbitals(ig)
       enddo ! io_PC
@@ -851,10 +801,8 @@ subroutine get_projection_weight_bulk_unfold(ndim, k_SBZ_direct, k_PBZ_direct, p
    weight= weight/origincell%CellVolume*Folded_cell%CellVolume
    weight_matix_element= weight_matix_element/origincell%CellVolume*Folded_cell%CellVolume
 
-   if ( Matrix_Element_calc .eqv. .True. ) then
-   weight = weight_matix_element
-   end if 
-   
+   !> uncomment the next line when considering the matrix element effect in Graphene system
+   !weight = weight_matix_element
 
    return
 end subroutine get_projection_weight_bulk_unfold

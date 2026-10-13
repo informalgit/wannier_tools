@@ -1,5 +1,4 @@
-OBJ =  module.o sparse.o wt_aux.o math_lib.o mgmres.o symmetry.o \
-		  readHmnR.o inverse.o proteus.o \
+OBJ =  module.o sparse.o wt_aux.o math_lib.o symmetry.o readHmnR.o inverse.o proteus.o \
        eigen.o ham_qlayer2qlayer.o psi.o unfolding.o rand.o \
   		 ham_slab.o ham_bulk.o ek_slab.o ek_bulk_polar.o ek_bulk.o \
        readinput.o fermisurface.o surfgreen.o surfstat.o \
@@ -10,7 +9,6 @@ OBJ =  module.o sparse.o wt_aux.o math_lib.o mgmres.o symmetry.o \
 		 berry.o wanniercenter_adaptive.o \
   		 effective_mass.o findnodes.o \
 		 sigma_OHE.o sigma.o Boltz_transport_anomalous.o \
-		 2D_TSC.o optic.o orbital_hall.o\
 	main.o
 
 

@@ -209,10 +209,6 @@ subroutine ham_3Dlandau_sparse1(nnz, Ndimq, Nq, k, acoo,jcoo,icoo)
       stop
    endif
 
-   !> if we want to calculate the Chern number, we use open boundary such
-   !> that we can get the Chern number from the edge states.
-   if(landau_chern_calc) goto 328
-
    !>> calculate inter-hopping between layers
    ! i1 column index
    do i1=1, Nq
@@ -325,7 +321,6 @@ subroutine ham_3Dlandau_sparse1(nnz, Ndimq, Nq, k, acoo,jcoo,icoo)
 
    enddo ! i1
 
-328 continue
    if (cpuid.eq.0) write(stdout,*) 'nnz, nnzmax after H01:', ncoo, nnz
    if (nnz< ncoo) then
       write(*, *)'Please increase nnzmax in the sparse.f90'
@@ -409,9 +404,10 @@ subroutine ham_3Dlandau_sparseHR(nnz, Ndimq, Nq, k, acoo,jcoo,icoo)
 
          !> sum over R points to get H(k1, k2)
          do ims=1,splen
-            ia=dble(hirv(1,ims))
-            ib=dble(hirv(2,ims))
-            ic=dble(hirv(3,ims))
+            ir=hirv(ims)
+            ia=dble(irvec(1,iR))
+            ib=dble(irvec(2,iR))
+            ic=dble(irvec(3,iR))
 
             !> new lattice
             call latticetransform(ia, ib, ic, new_ia, new_ib, new_ic)
@@ -443,7 +439,7 @@ subroutine ham_3Dlandau_sparseHR(nnz, Ndimq, Nq, k, acoo,jcoo,icoo)
             phase=phase2(Ri,Rj)
             fac= cos(phase)+ zi*sin(phase)
 
-            tmp=hacoo(ims)*ratio* fac
+            tmp=hacoo(ims)*ratio/ndegen(iR)* fac
             if(abs(tmp)/eV2Hartree > 1e-6) then
                ncoo=ncoo+1
                icoo(ncoo)=hicoo(ims)+(i1-1)*Num_wann
@@ -470,9 +466,10 @@ subroutine ham_3Dlandau_sparseHR(nnz, Ndimq, Nq, k, acoo,jcoo,icoo)
 
          !> sum over R points to get H(k1, k2)
          do ims=1,splen
-            ia=dble(hirv(1,ims))
-            ib=dble(hirv(2,ims))
-            ic=dble(hirv(3,ims))
+            ir=hirv(ims)
+            ia=dble(irvec(1,iR))
+            ib=dble(irvec(2,iR))
+            ic=dble(irvec(3,iR))
 
             !> new lattice
             call latticetransform(ia, ib, ic, new_ia, new_ib, new_ic)
@@ -505,7 +502,7 @@ subroutine ham_3Dlandau_sparseHR(nnz, Ndimq, Nq, k, acoo,jcoo,icoo)
             phase=phase2(Ri,Rj)
             fac= cos(phase)+ zi*sin(phase)
 
-            tmp=hacoo(ims)*ratio* fac
+            tmp=hacoo(ims)*ratio/ndegen(iR)* fac
             if(abs(tmp)/eV2Hartree  > 1e-6) then
                ncoo=ncoo+1
                icoo(ncoo)=hicoo(ims)+(i1-1)*Num_wann
@@ -631,24 +628,20 @@ subroutine sparse_landau_level_B
    if (neval>=Ndimq) neval= Ndimq- 2
 
    !> ncv
-   nvecs=int(3*neval)
+   nvecs=int(2*neval)
 
    if (nvecs<50) nvecs= 50
    if (nvecs>Ndimq) nvecs= Ndimq
 
 
-   sigma=(1d0,0d0)*iso_energy
+   sigma=(1d0,0d0)*E_arc
 
    Nmag= Magp-1
    Nmag1=Nmag/1
 
-   if (nnzmax_input<0)then
-      nnzmax= Num_wann*(2*ijmax+1)*Ndimq+Ndimq
-      if(Is_Sparse_Hr) nnzmax=splen*nq+Ndimq
-   else
-      nnzmax= nnzmax_input
-   endif
- 
+   nnzmax= Num_wann*(2*ijmax+1)*Ndimq+Ndimq
+   if(Is_Sparse_Hr) nnzmax=splen*nq+Ndimq
+
    allocate( acoo(nnzmax), stat=ierr)
    call printallocationinfo('acoo', ierr)
    allocate( jcoo(nnzmax), stat=ierr)
@@ -759,7 +752,9 @@ subroutine sparse_landau_level_B
 
       !> diagonalization by call zheev in lapack
       W= 0d0
+#if defined (INTELMKL)
       call arpack_sparse_coo_eigs(Ndimq,nnzmax,nnz,acoo,jcoo,icoo,neval,nvecs,W,sigma, zeigv, LandauLevel_wavefunction_calc)
+#endif
       call now(time3)
       eigv(:, ib)= W
       if (cpuid==0)write(stdout, '(a, f20.2, a)')'  >> Time cost for constructing H: ', time2-time1, ' s'
@@ -935,25 +930,19 @@ subroutine sparse_landau_level_k
    Nq= Magq
    Nmag= Nq
    Ndimq= Num_wann* Nq
-   if (nnzmax_input<0)then
-      nnzmax= Num_wann*(2*ijmax+1)*Ndimq+Ndimq
-      if(Is_Sparse_Hr) nnzmax=splen*nq+Ndimq
-   else
-      nnzmax= nnzmax_input
-   endif
- 
-
+   nnzmax= Num_wann*(2*ijmax+1)*Ndimq+Ndimq
+   if(Is_Sparse_Hr) nnzmax=splen*nq+Ndimq
    if (NumSelectedEigenVals==0) NumSelectedEigenVals=OmegaNum
    neval=NumSelectedEigenVals
    if (neval>=Ndimq) neval= Ndimq- 2
 
    !> ncv
-   nvecs=int(3*neval)
+   nvecs=int(2*neval)
 
    if (nvecs<50) nvecs= 50
    if (nvecs>Ndimq) nvecs= Ndimq
 
-   sigma=(1d0,0d0)*iso_energy
+   sigma=(1d0,0d0)*E_arc
 
    allocate( acoo(nnzmax), stat= ierr)
    call printallocationinfo('acoo', ierr)
@@ -1069,7 +1058,7 @@ subroutine sparse_landau_level_k
       call now(time_start)
 
       if (cpuid==0) write(stdout, '(a, 2i10)') 'LandauLevel_k_calc', ik,nk3_band
-      k3 = kpath_3d(:, ik)
+      k3 = K3points(:, ik)
       nnz= nnzmax
       call now(time1)
       acoo= 0d0
@@ -1083,7 +1072,9 @@ subroutine sparse_landau_level_k
 
       !> diagonalization by call zheev in lapack
       W= 0d0
+#if defined (INTELMKL)
       call arpack_sparse_coo_eigs(Ndimq,nnzmax,nnz,acoo,jcoo,icoo,neval,nvecs,W,sigma, zeigv, LandauLevel_wavefunction_calc)
+#endif
 
       call now(time3)
       eigv(1:neval, ik)= W(1:neval)
@@ -1208,12 +1199,12 @@ subroutine sparse_landau_level_k
       write(outfileindex, '(a)')'#set xtics offset 0, -1'
       write(outfileindex, '(a)')'#set ylabel offset -1, 0 '
       write(outfileindex, '(a)')'rgb(r,g,b) = int(r)*65536 + int(g)*256 + int(b)'
-      write(outfileindex, 202, advance="no") (k3line_name(i), k3line_mag_stop(i)*Angstrom2atomic, i=1, nk3lines)
-      write(outfileindex, 203)k3line_name(nk3lines+1), k3line_mag_stop(nk3lines+1)*Angstrom2atomic
+      write(outfileindex, 202, advance="no") (k3line_name(i), k3line_mag_stop(i), i=1, nk3lines)
+      write(outfileindex, 203)k3line_name(nk3lines+1), k3line_mag_stop(nk3lines+1)
       write(outfileindex, '(a, f10.5, a, f10.5, a)')'set yrange [', emin, ':', emax, ']'
 
       do i=1, nk3lines-1
-         write(outfileindex, 204)k3line_mag_stop(i+1)*Angstrom2atomic, emin, k3line_mag_stop(i+1)*Angstrom2atomic, emax
+         write(outfileindex, 204)k3line_mag_stop(i+1), emin, k3line_mag_stop(i+1), emax
       enddo
 
 202   format('set xtics (',:20('"',A3,'" ',F10.5,','))
@@ -1282,7 +1273,6 @@ subroutine sparse_landau_dos
 
    real(dp) :: B0
    real(dp) :: theta
-   real(dp) :: eta_broadening
 
    integer :: nnzmax, nnz
    real(dp) :: dis, dis1
@@ -1327,8 +1317,8 @@ subroutine sparse_landau_dos
    NE= OmegaNum
    emin= OmegaMin
    emax= OmegaMax
-   eta_broadening= (emax- emin)/ dble(NE)*1d0
-   if (cpuid.eq.0) write(stdout,*) 'eta_broadening=',eta_broadening
+   eta= (emax- emin)/ dble(NE)*1d0
+   if (cpuid.eq.0) write(stdout,*) 'eta=',eta
    allocate(dos_mpi(knv3,NE))
    allocate(dos(knv3,NE))
    allocate(omega(NE))
@@ -1337,7 +1327,7 @@ subroutine sparse_landau_dos
    if (NumSelectedEigenVals==0) NumSelectedEigenVals=Ndimq
    neval=NumSelectedEigenVals
    nvecs=2*neval
-   sigma=(1d0,0d0)*iso_energy
+   sigma=(1d0,0d0)*E_arc
    Nq= Magq
    Nmag= Nq
    Nmag1=20
@@ -1413,11 +1403,13 @@ subroutine sparse_landau_dos
       !> diagonalization by call zheev in lapack
       W= 0d0
       !        call eigensystem_c( 'N', 'U', Ndimq ,ham_landau, W)
+#if defined (INTELMKL)
       call arpack_sparse_coo_eigs(Ndimq,nnzmax,nnz,acoo,jcoo,icoo,neval,nvecs,W,sigma, zeigv, LandauLevel_wavefunction_calc)
+#endif
       do ie= 1, NE
          do iv= 1, neval
             x= omega(ie)- W(iv)
-            dos_mpi(ik,ie) = dos_mpi(ik,ie)+ delta(eta_broadening, x)
+            dos_mpi(ik,ie) = dos_mpi(ik,ie)+ delta(eta, x)
          enddo ! iv
       enddo ! ie
       if(cpuid==0) then
@@ -1529,12 +1521,12 @@ subroutine sparse_export_maghr
    if (neval>=Ndimq) neval= Ndimq- 2
 
    !> ncv
-   nvecs=int(3*neval)
+   nvecs=int(2*neval)
 
    if (nvecs<50) nvecs= 50
    if (nvecs>Ndimq) nvecs= Ndimq
 
-   sigma=(1d0,0d0)*iso_energy
+   sigma=(1d0,0d0)*E_arc
 
    allocate( acoo(nnzmax), stat= ierr)
    call printallocationinfo('acoo', ierr)
@@ -1749,12 +1741,12 @@ subroutine sparse_export_maghr
       write(outfileindex, '(a)')'#set xtics offset 0, -1'
       write(outfileindex, '(a)')'#set ylabel offset -1, 0 '
       write(outfileindex, '(a)')'rgb(r,g,b) = int(r)*65536 + int(g)*256 + int(b)'
-      write(outfileindex, 202, advance="no") (k3line_name(i), k3line_mag_stop(i)*Angstrom2atomic, i=1, nk3lines)
-      write(outfileindex, 203)k3line_name(nk3lines+1), k3line_mag_stop(nk3lines+1)*Angstrom2atomic
+      write(outfileindex, 202, advance="no") (k3line_name(i), k3line_mag_stop(i), i=1, nk3lines)
+      write(outfileindex, 203)k3line_name(nk3lines+1), k3line_mag_stop(nk3lines+1)
       write(outfileindex, '(a, f10.5, a, f10.5, a)')'set yrange [', emin, ':', emax, ']'
 
       do i=1, nk3lines-1
-         write(outfileindex, 204)k3line_mag_stop(i+1)*Angstrom2atomic, emin, k3line_mag_stop(i+1)*Angstrom2atomic, emax
+         write(outfileindex, 204)k3line_mag_stop(i+1), emin, k3line_mag_stop(i+1), emax
       enddo
 
 202   format('set xtics (',:20('"',A3,'" ',F10.5,','))

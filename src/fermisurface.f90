@@ -285,7 +285,7 @@
         endif
 
 
-        Hamk_bulk= (iso_energy -zi* Fermi_broadening)* ones - Hamk_bulk
+        Hamk_bulk= (E_arc -zi* eta_arc)* ones - Hamk_bulk
         call inv(Num_wann, Hamk_bulk)
         do i=1, Num_wann
            dos(ik, i)= aimag(Hamk_bulk(i, i))/pi
@@ -439,7 +439,7 @@
 
      integer :: ia, ik, i, j, i1, i2, ig, io
      integer :: knv3, nkx, nky, ierr, nwann
-     real(dp) :: kz, k(3), s0(3), s0t(3), s0_len
+     real(dp) :: kz, k(3), s0(3)
      
      ! Hamiltonian of bulk system
      complex(Dp), allocatable :: Hamk_bulk(:, :)
@@ -463,7 +463,6 @@
      complex(dp), allocatable :: ones(:, :), ctemp(:, :)
 
      logical, external :: if_in_the_WS
-     real(dp), external :: norm
 
 
      nkx= Nk
@@ -567,7 +566,7 @@
         Hamk_bulk= 0d0
         call ham_bulk_latticegauge(k, Hamk_bulk)
 
-        Hamk_bulk= (iso_energy -zi* Fermi_broadening)* ones - Hamk_bulk
+        Hamk_bulk= (E_arc -zi* eta_arc)* ones - Hamk_bulk
 
         !> Hamk_bulk is the Green's function after subroutine inv.
         call inv(Num_wann, Hamk_bulk)
@@ -666,14 +665,9 @@
            write(outfileindex, "('#column', i5, 3000i16)")(i, i=1, 7+4*NumberofSelectedOrbitals_groups)
            do ik=1, knv3
               do ig=1, NumberofSelectedOrbitals_groups
-                 s0(1)= sx_selected_mpi(ik, ig)   /dos_selected_mpi(ik, ig)
-                 s0(2)= sy_selected_mpi(ik, ig)   /dos_selected_mpi(ik, ig)
-                 s0(3)= sz_selected_mpi(ik, ig)   /dos_selected_mpi(ik, ig)
-
-                !s0_len= norm(s0t)
-                !if (s0_len>eps6) then
-                !   s0= s0t/s0_len
-                !endif
+                 s0(1)= sx_selected_mpi(ik, ig)  /dos_selected_mpi(ik, ig)
+                 s0(2)= sy_selected_mpi(ik, ig)  /dos_selected_mpi(ik, ig)
+                 s0(3)= sz_selected_mpi(ik, ig)  /dos_selected_mpi(ik, ig)
                  call rotate_k3_to_kplane(s0, s1(:, ig))
               enddo
               write(outfileindex, '(3000E16.8)')kxy_shape(:, ik)*Angstrom2atomic, kxy_plane(:, ik)*Angstrom2atomic, &
@@ -894,7 +888,7 @@ subroutine fermisurface_stack
            Hamk_bulk= 0d0
            call ham_bulk_latticegauge(k, Hamk_bulk)
    
-           Hamk_bulk= (iso_energy -zi* Fermi_broadening)* ones - Hamk_bulk
+           Hamk_bulk= (E_arc -zi* eta_arc)* ones - Hamk_bulk
            call inv(Num_wann, Hamk_bulk)
    
            do i=1, Num_wann
@@ -1583,7 +1577,7 @@ subroutine fermisurface_stack
       density = 0d0
       
       eta_array=(/0.1d0, 0.2d0, 0.4d0, 0.8d0, 1.0d0, 2d0, 4d0, 8d0, 10d0/)
-      eta_array= eta_array*Fermi_broadening
+      eta_array= eta_array*Eta_Arc
 
       if (NumT>1) then
          do iT=1, NumT

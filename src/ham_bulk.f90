@@ -207,83 +207,6 @@ subroutine d2Hdk2_atomicgauge(k, DHDk2_wann)
    return
 end subroutine d2Hdk2_atomicgauge
 
-subroutine d2Hdk2_atomicgauge_wann(k, D2HDk2_wann)
-   !> second derivatve of H(k)
-   use para, only : Nrpts, irvec, crvec, Origin_cell, HmnR, ndegen, &
-       Num_wann, dp, Rcut, pi2zi, zi, twopi, pi
-   implicit none
-
-   !> momentum in 3D BZ
-   real(dp), intent(in) :: k(3)
-
-   !> second derivate of H(k)
-   complex(dp), intent(out) :: D2HDk2_wann(Num_wann, Num_wann, 3, 3)
-
-   integer :: iR, i1, i2, i, j
-
-   real(dp) :: pos(3), pos1(3), pos2(3), pos_cart(3), pos_direct(3)
-   real(dp) :: kdotr, dis
-   complex(dp) :: ratio
-   real(dp), external :: norm
-
-   D2HDk2_wann= 0d0
-   !> the first atom in home unit cell
-   do iR=1, Nrpts
-      do i2=1, Num_wann
-         pos2= Origin_cell%wannier_centers_direct(:, i2)
-         !> the second atom in unit cell R
-         do i1=1, Num_wann
-            pos1= Origin_cell%wannier_centers_direct(:, i1)
-            pos_direct= irvec(:, iR)
-            pos_direct= pos_direct+ pos2- pos1
-
-            call direct_cart_real(pos_direct, pos_cart, Origin_cell%lattice)
-
-            dis= norm(pos_cart)
-            if (dis> Rcut) cycle
-
-            kdotr=k(1)*pos_direct(1) + k(2)*pos_direct(2) + k(3)*pos_direct(3)
-            ratio= (cos(twopi*kdotr)+zi*sin(twopi*kdotr))/ndegen(iR)
-
-            do j=1, 3
-               do i=1, 3
-                  D2HDk2_wann(i1, i2, i, j)=D2HDk2_wann(i1, i2, i, j) &
-                     -pos_cart(i)*pos_cart(j)*HmnR(i1, i2, iR)*ratio
-               enddo ! j 
-            enddo ! i
-         enddo ! i1
-      enddo ! i2
-   enddo ! iR
-
-   return
-end subroutine d2Hdk2_atomicgauge_wann
-
-subroutine d2Hdk2_atomicgauge_Ham(UU, dHdkdk, D2HDk2_Ham)
-   !> Transform d2H/dk^2 from Wannier gauge to Hamiltonian gauge
-   use para, only : Num_wann, dp
-   implicit none
-
-   ! Inputs
-   complex(dp), intent(in)  :: UU(Num_wann, Num_wann)
-   complex(dp), intent(in)  :: dHdkdk(Num_wann, Num_wann, 3, 3)
-
-   ! Output
-   complex(dp), intent(out) :: D2HDk2_Ham(Num_wann, Num_wann, 3, 3)
-
-   ! Locals
-   integer :: i, j
-   complex(dp) :: mat_tmp(Num_wann, Num_wann)
-
-   do j = 1, 3
-      do i = 1, 3
-         call rotation_to_Ham_basis(UU, dHdkdk(:, :, i, j), mat_tmp)
-         D2HDk2_Ham(:, :, i, j) = mat_tmp
-      enddo ! i
-   enddo ! j
-
-   return
-end subroutine d2Hdk2_atomicgauge_Ham
-
 subroutine dHdk_atomicgauge(k, velocity_Wannier)
    !> Velocity operator in Wannier basis using atomic gauge
    !> First derivate of H(k); dH(k)/dk
@@ -402,142 +325,20 @@ subroutine ham_bulk_latticegauge(k,Hamk_bulk)
    !Hamk_bulk= (Hamk_bulk+ mat2)/2d0
 
    ! check hermitcity
-  !打印出k点
-   ! write(*,*)'check Hamk_bulk hermitcity'
-  do i1=1, Num_wann
-    do i2=1, Num_wann
-       if(abs(Hamk_bulk(i1,i2)-conjg(Hamk_bulk(i2,i1))).ge.1e-6)then
-          write(stdout,*)'there is something wrong with Hamk_bulk'
-          write(stdout,*)'i1, i2', i1, i2
-          write(stdout,*)'value at (i1, i2)', Hamk_bulk(i1, i2)
-          write(stdout,*)'value at (i2, i1)', Hamk_bulk(i2, i1)
-          !stop
-       endif
-    enddo
-  enddo
+   do i1=1, Num_wann
+      do i2=1, Num_wann
+         if(abs(Hamk_bulk(i1,i2)-conjg(Hamk_bulk(i2,i1))).ge.1e-6)then
+            write(stdout,*)'there is something wrong with Hamk_bulk'
+            write(stdout,*)'i1, i2', i1, i2
+            write(stdout,*)'value at (i1, i2)', Hamk_bulk(i1, i2)
+            write(stdout,*)'value at (i2, i1)', Hamk_bulk(i2, i1)
+            !stop
+         endif
+      enddo
+   enddo
 
    return
 end subroutine ham_bulk_latticegauge
-
-
-subroutine S_bulk_latticegauge(k,Sk_bulk)
-   ! This subroutine caculates Hamiltonian for
-   ! bulk system without the consideration of the atom's position
-   !
-   ! History
-   !
-   !        May/29/2011 by Quansheng Wu
-
-   use para, only : dp, pi2zi, SmnR, ndegen, nrpts, irvec, Num_wann, stdout, twopi, zi
-   implicit none
-
-   ! loop index
-   integer :: i1,i2,iR
-
-   real(dp) :: kdotr
-
-   complex(dp) :: factor
-
-   real(dp), intent(in) :: k(3)
-
-   ! Hamiltonian of bulk system
-   complex(Dp),intent(out) ::Sk_bulk(Num_wann, Num_wann)
-
-   Sk_bulk=0d0
-   do iR=1, Nrpts
-      kdotr= k(1)*irvec(1,iR) + k(2)*irvec(2,iR) + k(3)*irvec(3,iR)
-      factor= (cos(twopi*kdotr)+zi*sin(twopi*kdotr))
-
-      Sk_bulk(:, :)= Sk_bulk(:, :)+ SmnR(:, :, iR)*factor
-   enddo ! iR
-   
-   !call mat_mul(Num_wann, mirror_z, Hamk_bulk, mat1)
-   !call mat_mul(Num_wann, mat1, mirror_z, mat2)
-   !Hamk_bulk= (Hamk_bulk+ mat2)/2d0
-
-   ! check hermitcity
-   ! write(*,*)'check Sk_bulk'
-  do i1=1, Num_wann
-    do i2=1, Num_wann
-       if(abs(Sk_bulk(i1,i2)-conjg(Sk_bulk(i2,i1))).ge.1e-6)then
-          write(stdout,*)'there is something wrong with Sk_bulk'
-          write(stdout,*)'i1, i2', i1, i2
-          write(stdout,*)'value at (i1, i2)', Sk_bulk(i1, i2)
-          write(stdout,*)'value at (i2, i1)', Sk_bulk(i2, i1)
-          !stop
-       endif
-    enddo
-  enddo
-
-   return
-end subroutine S_bulk_latticegauge
-
-!---------------------------------------------------------------
-! Surroutines:change the non-orthogonal basis H and S to orthogonal basis
-!   H_new = U * H_old * U
-!   U = S_vec * M_inv * S_vec^H
-!---------------------------------------------------------------
-subroutine orthogonalize_hamiltonian(Hamk_bulk, Sk_bulk , N)
-   use para, only: Dp, stdout,E_fermi,eV2Hartree
-   implicit none
- 
-   integer, intent(in)       :: N
-   complex(Dp), intent(in )    :: Sk_bulk(N,N)
-   complex(Dp), intent(inout)  :: Hamk_bulk(N,N)
- 
-   !-- 局部 --
-   integer           :: i, info, j
-   real(Dp), allocatable    :: S_vals(:)
-   complex(Dp), allocatable :: S_vec(:,:), M_inv(:,:), U(:,:)
- 
-
-   allocate(S_vals(N))
-   allocate(S_vec (N,N))
-   allocate(M_inv (N,N))
-   allocate(U     (N,N))
-   U = (0.0_dp,0.0_dp)
-   ! 1) Sk_bulk =  S_vec * diag(S_vals) * S_vec^H 
-   S_vec = Sk_bulk
-   call eigensystem_c('V','U', N, S_vec, S_vals)
- 
-   ! 2)  M_inv = diag(1/√S_vals)
-   M_inv = (0.0_dp,0.0_dp)
-   ! do i = 1, N
-   !   M_inv(i,i) = 1.0_dp / sqrt(S_vals(i))
-   ! end do
-
-   do i = 1, N
-      if (S_vals(i) <= 0.0_dp) then
-         write(stdout,'(a,i5,1pe13.4)') ' WARNING: λ <= 0, i =', i, S_vals(i)
-      else
-         M_inv(i,i) = 1.0_dp / sqrt(S_vals(i))
-      endif
-   enddo
- 
-   ! 3) U = S_vec * M_inv * S_vec^H
-   ! U = matmul( S_vec, matmul(M_inv, conjg(transpose(S_vec))) )
-   U = matmul( S_vec, M_inv )
-   U = matmul(U, conjg(transpose(S_vec)))
-
-   ! call mat_mul(N, S_vec, M_inv, U)
-   ! call mat_mul(N, U, conjg(transpose(S_vec)), U)
-
- 
-   ! 4)Hamiltonian = U * Hamk_bulk * U
-   ! Hamk_bulk = matmul( U, matmul(Hamk_bulk, U) )
-   Hamk_bulk = matmul(U, Hamk_bulk)
-   Hamk_bulk = matmul(Hamk_bulk, U)
-   ! call mat_mul(N, U, Hamk_bulk, Hamk_bulk)
-   ! call mat_mul(N, Hamk_bulk, U, Hamk_bulk)
-
-   do i = 1, N
-      Hamk_bulk(i,i) = Hamk_bulk(i,i) - E_fermi*eV2Hartree
-   enddo
-
-   deallocate(S_vals, S_vec, M_inv, U)
-end subroutine orthogonalize_hamiltonian
- 
-
 
 subroutine dHdk_latticegauge_wann(k, velocity_Wannier)
    use para, only : Nrpts, irvec, crvec, Origin_cell, &
@@ -779,119 +580,6 @@ subroutine ham_bulk_LOTO(k,Hamk_bulk)
    return
 end subroutine ham_bulk_LOTO
 
-subroutine ham_bulk_kp_abcb_graphene(k,Hamk_bulk)
-   ! > construct the kp model at K point of ABCB tetralayer graphene
-
-   use para, only : Num_wann, dp, stdout, zi, zzero, One_complex, &
-      Symmetrical_Electric_field_in_eVpA, eV2Hartree, Angstrom2atomic, &
-      Electric_field_in_eVpA, Origin_cell, cpuid
-   implicit none
-
-   integer :: i1,i2,ia,ib,ic,iR, nwann, io, i
-   integer :: add_electric_field
-   real(dp) :: pos(Origin_cell%Num_atoms)
-   real(dp) :: static_potential
-
-   ! coordinates of R vector
-   real(Dp) :: R(3), R1(3), R2(3), kdotr, kx, ky, kz
-   real(dp) :: v,v3,v4,v6,v7,d1,d2,d3,d4,d5,d6,d7,d8,g1,g2,g3,g4,g5,g6
-
-   complex(dp) :: factor, km, kp
-
-   real(dp), intent(in) :: k(3)
-
-   !> the k point that the kp model is constructed
-   !> in fractional coordinate
-   real(dp) :: k_center_direct(3), l(19)
-
-   ! Hamiltonian of bulk system
-   complex(Dp),intent(out) ::Hamk_bulk(Num_wann, Num_wann)
-
-   if (Num_wann/=8) then
-      print *, "Error : in this kp model, num_wann should be 8"
-      print *, 'Num_wann', Num_wann
-      stop
-   endif
-  !l=(/ 1.26416117e+01, -5.57664351e+00, -5.87940524e+00,  1.60839693e+01, &
-  ! 8.13551651e+00,  2.82753440e-01,  9.16947940e-03, -2.61922210e-03, &
-  !-2.77215942e-03,  7.01879554e-03, -3.38271168e-01, -6.64427749e-02, &
-  !-3.08356540e-02, -8.82150889e-03, -2.57865658e-03,  1.83192652e-01, &
-  ! 4.35695252e-03, -2.28829893e-01, -1.82821963e-02/)
-
-   l=(/1.57937270e+01, -2.49047067e+00, -1.82376120e+00,  1.21854647e-02, &
-    -5.75783391e+00, -2.09787893e-01,  7.48348077e-03,  2.03490675e-01, &
-    -1.82294202e-04,  3.11506594e-02, -1.32325756e-01,  2.72568864e-01, &
-     2.27263042e-02, -2.57806046e-01, -2.01920757e-01, -2.46168084e-01, &
-    -1.45799538e-01, -1.59225389e-01, -2.20335989e-01/)
-
-   v=l(1); v3=l(2); v4=l(3); v6=l(4); v7=l(5);
-   d1=l(6); d2= l(7); d3= l(8); d4=l(9); d5=l(10); d6= l(11); d7=l(12); d8= l(19)
-   g1= l(13); g2= l(14); g3= l(15); g4= l(16); g5= l(17); g6= l(18);
-
-   k_center_direct= (/1d0/3d0, 1d0/3d0, 0d0/)
-   kx=k(1) -k_center_direct(1)
-   ky=k(2) -k_center_direct(2)
-   kz=k(3) -k_center_direct(3)
-
-   km=-kx+ zi*ky
-   kp=-kx- zi*ky
-   !> write out the parameters
-   if (cpuid.eq.0) then
-   !  write(stdout, '(a, 8f8.4)') '> Onsite energies: ', d1, d2, d3, d4, d5, d6, d7, d8
-   endif
-
-   Hamk_bulk= 0d0
-   !> kp
-   Hamk_bulk(:, 1)= (/d1*One_complex, v*kp, -v4*kp, v3*km, v6*km, g6*One_complex, zzero, zzero/)
-   Hamk_bulk(:, 2)= (/v*km, d2*One_complex, g1*One_complex, -v4*kp, v7*kp, v6*km, zzero, zzero/)
-   Hamk_bulk(:, 3)= (/-v4*km, g1*One_complex, d3*One_complex, v*kp, -v4*kp, v3*km, g4*One_complex, zzero/)
-   Hamk_bulk(:, 4)= (/v3*kp, -v4*km, v*km, d4*One_complex, g2*One_complex, -v4*kp, zzero, g5*One_complex/)
-   Hamk_bulk(:, 5)= (/v6*kp, v7*km, -v4*km, g2*One_complex, d5*One_complex, v*kp, -v4*km, g3*One_complex/)
-   Hamk_bulk(:, 6)= (/g6*One_complex, v6*kp, v3*kp, -v4*km, v*km, d6*One_complex, v3*kp, -v4*km/)
-   Hamk_bulk(:, 7)= (/zzero, zzero, g4*One_complex, zzero, -v4*kp, v3*km, d7*One_complex, v*kp/)
-   Hamk_bulk(:, 8)= (/zzero, zzero, zzero, g5*One_complex, g3*One_complex, -v4*kp, v*km, d8*One_complex/)
-
-   !> add electrical field
-
-   call get_stacking_direction_and_pos(add_electric_field, pos)
- 
-   if (add_electric_field>0) then
-      io=0
-      do ia=1, Origin_cell%Num_atoms
-         !static_potential= pos(ia)*Origin_cell%cell_parameters(add_electric_field)*Electric_field_in_eVpA
-         !if (Inner_symmetrical_Electric_Field) then
-         !   static_potential= abs(pos(ia)*Origin_cell%cell_parameters(add_electric_field))*Electric_field_in_eVpA
-         !endif
-         static_potential= abs(pos(ia)*Origin_cell%cell_parameters(add_electric_field))&
-            *Symmetrical_Electric_field_in_eVpA*eV2Hartree/Angstrom2atomic+ &
-            (pos(ia)*Origin_cell%cell_parameters(add_electric_field))*&
-            Electric_field_in_eVpA*eV2Hartree/Angstrom2atomic
-
-         do i=1, Origin_cell%nprojs(ia)
-            io=io+1
-            Hamk_bulk(io, io)= Hamk_bulk(io, io)+ static_potential
-         enddo ! nproj
-      enddo ! ia
-   endif  ! add electric field or not
-
-   ! check hermitcity
-   do i1=1, Num_wann
-      do i2=1, Num_wann
-         if(abs(Hamk_bulk(i1,i2)-conjg(Hamk_bulk(i2,i1))).ge.1e-6)then
-            write(stdout,*)'there is something wrong with Hamk_bulk'
-            write(stdout,*)'i1, i2', i1, i2
-            write(stdout,*)'value at (i1, i2)', Hamk_bulk(i1, i2)
-            write(stdout,*)'value at (i2, i1)', Hamk_bulk(i2, i1)
-            !stop
-         endif
-      enddo
-   enddo
-   Hamk_bulk= Hamk_bulk*eV2Hartree
-
-   return
-end subroutine ham_bulk_kp_abcb_graphene
-
-
 subroutine ham_bulk_kp(k,Hamk_bulk)
    ! > construct the kp model at K point of WC system
    ! > space group is 187. The little group is C3h
@@ -1082,9 +770,10 @@ subroutine ham_bulk_coo_sparsehr_latticegauge(k,acoo,icoo,jcoo)
    integer :: i,j,ir
 
    do i=1,splen
+      ir=hirv(i)
       icoo(i)=hicoo(i)
       jcoo(i)=hjcoo(i)
-      posij= hirv(1:3, i)
+      posij=irvec(:, ir)
       kdotr=posij(1)*k(1)+posij(2)*k(2)+posij(3)*k(3)
       ratio= (cos(twopi*kdotr)+zi*sin(twopi*kdotr))
       acoo(i)=ratio*hacoo(i)
@@ -1092,6 +781,7 @@ subroutine ham_bulk_coo_sparsehr_latticegauge(k,acoo,icoo,jcoo)
 
    return
 end subroutine ham_bulk_coo_sparsehr_latticegauge
+
 
 subroutine ham_bulk_coo_sparsehr(k,acoo,icoo,jcoo)
    !> This subroutine use sparse hr format
@@ -1107,10 +797,11 @@ subroutine ham_bulk_coo_sparsehr(k,acoo,icoo,jcoo)
    complex(dp) ::  ratio
    integer :: i,j,ir
 
-   do i=1, splen
+   do i=1,splen
+      ir=hirv(i)
       icoo(i)=hicoo(i)
       jcoo(i)=hjcoo(i)
-      posij= hirv(1:3, i)+ Origin_cell%wannier_centers_direct(:, jcoo(i))- Origin_cell%wannier_centers_direct(:, icoo(i))
+      posij=irvec(:, ir)+ Origin_cell%wannier_centers_direct(:, jcoo(i))- Origin_cell%wannier_centers_direct(:, icoo(i))
       kdotr=posij(1)*k(1)+posij(2)*k(2)+posij(3)*k(3)
       ratio= (cos(twopi*kdotr)+zi*sin(twopi*kdotr))
       acoo(i)=ratio*hacoo(i)
@@ -1118,93 +809,6 @@ subroutine ham_bulk_coo_sparsehr(k,acoo,icoo,jcoo)
 
    return
 end subroutine ham_bulk_coo_sparsehr
-
-
-subroutine overlap_bulk_coo_sparse(k, acoo, icoo, jcoo)
-   !> This subroutine use sparse hr format
-   !> Here we use atomic gauge which means the atomic position is taken into account
-   !> in the Fourier transformation
-   use para
-   implicit none
-
-   real(dp) :: k(3), posij(3)
-   real(dp) :: kdotr
-   integer,intent(inout) :: icoo(splen_overlap_input),jcoo(splen_overlap_input)
-   complex(dp),intent(inout) :: acoo(splen_overlap_input)
-   complex(dp) ::  ratio
-   integer :: i,j,ir
-
-   do i=1, splen_overlap_input
-      icoo(i)=sicoo(i)
-      jcoo(i)=sjcoo(i)
-      posij= sirv(1:3, i)+ Origin_cell%wannier_centers_direct(:, sjcoo(i))- Origin_cell%wannier_centers_direct(:, sicoo(i))
-      kdotr=posij(1)*k(1)+posij(2)*k(2)+posij(3)*k(3)
-      ratio= (cos(twopi*kdotr)+zi*sin(twopi*kdotr))
-      acoo(i)=ratio*sacoo(i)
-   end do
-
-   return
-end subroutine overlap_bulk_coo_sparse
-
-subroutine ham_bulk_tpaw(mdim, k, Hamk_moire)
-   ! This subroutine caculates Hamiltonian for
-   ! a twist system
-   !
-   !  Lattice gauge Hl
-   !  Atomic gauge Ha= U* Hl U 
-   !  where U = e^ik.wc(i) on diagonal
-   ! contact wuquansheng@gmail.com
-   ! 2024 Jan 19
-
-   use para
-   implicit none
-
-   !> leading dimension of Ham_moire
-   integer, intent(in) :: mdim
-   real(dp), intent(in) :: k(3)
-   complex(dp), intent(inout) :: hamk_moire(mdim, mdim)
-
-   ! wave vector in 3d
-   real(Dp) :: kdotr, pos0(3), dis
-
-   complex(dp) :: factor
-
-   real(dp) :: pos(3), pos1(3), pos2(3), pos_cart(3), pos_direct(3)
-
-   integer :: Num_gvectors
-
-   !> dimension 3*Num_gvectors 
-   real(dp), allocatable :: gvectors(:, :)
-
-   integer :: i1, i2
-
-   !> for a test, we assume a twist homo-bilayer system
-   ! mdim= Num_gvectors* Folded_cell%NumberOfspinorbitals*2
-
-   hamk_moire=0d0
-
-   !> first, set G vectors
-
-   !> construct T matrix
-   !> the dimension of the T matrix is num_wann
-   
-
-   ! check hermitcity
-   do i1=1, mdim
-      do i2=1, mdim
-         if(abs(hamk_moire(i1,i2)-conjg(hamk_moire(i2,i1))).ge.1e-6)then
-            write(stdout,*)'there is something wrong with hamk_moire'
-            write(stdout,*)'i1, i2', i1, i2
-            write(stdout,*)'value at (i1, i2)', hamk_moire(i1, i2)
-            write(stdout,*)'value at (i2, i1)', hamk_moire(i2, i1)
-            !stop
-         endif
-      enddo
-   enddo
-
-   return
-end subroutine ham_bulk_tpaw
-
 
 subroutine valley_k_coo_sparsehr(nnz, k,acoo,icoo,jcoo)
    !> This subroutine use sparse hr format

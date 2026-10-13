@@ -1,6 +1,6 @@
-  subroutine Berry_curvature_singlek_EF(k, mu, Omega_x, Omega_y, Omega_z)
+  subroutine berry_curvarture_singlek_EF(k, mu, Omega_x, Omega_y, Omega_z)
      !> Calculate Berry curvature for a sigle k point
-     !> The Fermi distribution is determined by the Fermi level iso_energy
+     !> The Fermi distribution is determined by the Fermi level E_arc
      !> ref : Physical Review B 74, 195118(2006)
      !
      !> eqn (34)
@@ -69,8 +69,8 @@
      Omega_z= -Omega_z*2d0*zi
 
      !> consider the Fermi-distribution according to the broadening Earc_eta
-     if (Fermi_broadening<eps6) Fermi_broadening= eps6
-     beta_fake= 1d0/Fermi_broadening
+     if (Eta_Arc<eps6) Eta_Arc= eps6
+     beta_fake= 1d0/Eta_Arc
      do m= 1, Num_wann
         Omega_x(m)= Omega_x(m)*fermi(W(m)-mu, beta_fake)
         Omega_y(m)= Omega_y(m)*fermi(W(m)-mu, beta_fake)
@@ -78,9 +78,9 @@
      enddo
 
      return
-  end subroutine Berry_curvature_singlek_EF
+  end subroutine berry_curvarture_singlek_EF
 
-  subroutine Berry_curvature_singlek_numoccupied_slab_total(k, Omega_z)
+  subroutine berry_curvarture_singlek_numoccupied_slab_total(k, Omega_z)
      !> Calculate Berry curvature for a sigle k point
      !> The Fermi distribution is determined by the NumOccupied bands, not the Fermi level
      !> ref : Physical Review B 74, 195118(2006)
@@ -158,9 +158,9 @@
      Omega_z= -aimag(Omega_z*2d0)/Angstrom2atomic**2
 
      return
-  end subroutine Berry_curvature_singlek_numoccupied_slab_total
+  end subroutine berry_curvarture_singlek_numoccupied_slab_total
 
-  subroutine Berry_curvature_singlek_numoccupied_total(k, Omega_x, Omega_y, Omega_z)
+  subroutine berry_curvarture_singlek_numoccupied_total(k, Omega_x, Omega_y, Omega_z)
      !> Calculate Berry curvature for a sigle k point using Kubo-formula
      !> The Fermi distribution is determined by the NumOccupied bands, not the Fermi level
      !> ref : Physical Review B 74, 195118(2006)
@@ -230,9 +230,9 @@
      deallocate(Amat, velocity_wann, velocity_Ham)
 
      return
-  end subroutine Berry_curvature_singlek_numoccupied_total
+  end subroutine berry_curvarture_singlek_numoccupied_total
 
-  subroutine Berry_curvature_singlek_numoccupied(k, Omega_x, Omega_y, Omega_z)
+  subroutine berry_curvarture_singlek_numoccupied(k, Omega_x, Omega_y, Omega_z)
      !> Calculate Berry curvature for a sigle k point
      !> The Fermi distribution is determined by the NumOccupied bands, not the Fermi level
      !> ref : Physical Review B 74, 195118(2006)
@@ -300,9 +300,9 @@
      Omega_z= -Omega_z*2d0*zi
 
      return
-  end subroutine Berry_curvature_singlek_numoccupied
+  end subroutine berry_curvarture_singlek_numoccupied
 
-  subroutine Berry_curvature_singlek_allbands(Dmn_Ham, Omega_BerryCurv)
+  subroutine berry_curvarture_singlek_allbands(Dmn_Ham, Omega_BerryCurv)
      !> Calculate Berry curvature for a sigle k point and all bands
      !> ref : eqn (30) Physical Review B 74, 195118(2006)
      !> \Omega_n^{\gamma}(k)=i\sum_{\alpha\beta}\epsilon_{\gamma\alpha\beta}(D^{\alpha\dag}D^{\beta})_{nn}
@@ -360,7 +360,7 @@
      enddo
 
      return
-  end subroutine Berry_curvature_singlek_allbands
+  end subroutine berry_curvarture_singlek_allbands
 
 
   subroutine orbital_magnetization_singlek_allbands(Dmn_Ham, Vmn_Ham_nondiag, m_OrbMag)
@@ -462,7 +462,7 @@
      return
   end subroutine get_Dmn_Ham
 
-  subroutine Berry_curvature_slab
+  subroutine berry_curvarture_slab
      !> Calculate Berry curvature 
      !
      !> ref : Physical Review B 74, 195118(2006)
@@ -521,7 +521,7 @@
 
         Omega_z= 0d0
 
-        call Berry_curvature_singlek_numoccupied_slab_total(k, Omega_z(1))
+        call berry_curvarture_singlek_numoccupied_slab_total(k, Omega_z(1))
         Omega(ik) = sum(Omega_z)
 
      enddo ! ik
@@ -599,9 +599,9 @@
  
      return
 
-  end subroutine Berry_curvature_slab
+  end subroutine berry_curvarture_slab
 
-  subroutine Berry_curvature_line_occupied
+  subroutine berry_curvarture_line
      !> Calculate Berry curvature for a k line defined bu KPATH_BULK
      !
      !> ref : Physical Review B 74, 195118(2006)
@@ -623,12 +623,9 @@
 
      real(dp), external :: norm
 
-     complex(dp), allocatable :: Omega_x(:), Omega_y(:), Omega_z(:)
-     !> Berry curvature  (3, k)
-     real(dp), allocatable :: Omega(:, :), Omega_mpi(:, :)
-
      !> Berry curvature  (3, bands, k)
-     real(dp), allocatable :: Omega_sep_bk(:, :), Omega_sep_bk_mpi(:, :)
+     complex(dp), allocatable :: Omega_x(:), Omega_y(:), Omega_z(:)
+     real(dp), allocatable :: Omega(:, :), Omega_mpi(:, :)
 
      !> energy bands
      real(dp), allocatable :: eigv(:,:)
@@ -657,7 +654,7 @@
            ' time elapsed: ', time_end-time_start0 
 
         !> a k point in fractional coordinates
-        k= kpath_3d(:, ik)
+        k= k3points(:, ik)
 
         call now(time_start)
  
@@ -665,13 +662,13 @@
         Omega_y= 0d0
         Omega_z= 0d0
 
-        !call Berry_curvature_singlek_numoccupied_old(k, Omega_x, Omega_y, Omega_z)
+        !call berry_curvarture_singlek_numoccupied_old(k, Omega_x, Omega_y, Omega_z)
         if (Berrycurvature_kpath_EF_calc) then
-           call Berry_curvature_singlek_EF(k, iso_energy, Omega_x, Omega_y, Omega_z)
+           call berry_curvarture_singlek_EF(k, E_arc, Omega_x, Omega_y, Omega_z)
         else if (BerryCurvature_kpath_Occupied_calc) then
-           call Berry_curvature_singlek_numoccupied_total(k, Omega_x(1), Omega_y(1), Omega_z(1))
+           call berry_curvarture_singlek_numoccupied_total(k, Omega_x(1), Omega_y(1), Omega_z(1))
         else
-           write(*, *) 'ERROR: In subroutine Berry_curvature_line, we only support BerryCurvature_kpath_Occupied_calc '
+           write(*, *) 'ERROR: In subroutine berry_curvarture_line, we only support BerryCurvature_kpath_Occupied_calc '
            write(*, *) ' and Berrycurvature_kpath_EF_calc '
            stop
         endif
@@ -701,7 +698,7 @@
            'real(Omega_x)', 'real(Omega_y)', 'real(Omega_z)'
 
         do ik= 1, nk3_band
-           k=kpath_3d(:, ik)
+           k=k3points(:, ik)
            write(outfileindex, '(20E18.8)')k3len(ik)*Angstrom2atomic, real(Omega_mpi(:, ik))/Angstrom2atomic**2
         enddo
 
@@ -760,10 +757,10 @@
  
      return
 
-  end subroutine Berry_curvature_line_occupied
+  end subroutine berry_curvarture_line
 
 
-  subroutine berry_curvature_cube
+  subroutine berry_curvarture_cube
      !> Calculate Berry curvature  in a cube defined in KCUBE_BULK
      !
      !> ref : Physical Review B 74, 195118(2006)
@@ -778,9 +775,9 @@
      use para
      implicit none
     
-     integer :: ik, ierr, ikx, iky, ikz, n_kpoints, i, m, n
+     integer :: ik, ierr, ikx, iky, ikz, knv3, i, m, n
 
-     real(dp) :: k(3), o1(3), k_cart(3), emin, emax
+     real(dp) :: k(3), o1(3), k_cart(3)
      real(dp) :: time_start, time_end, time_start0
 
      real(dp), external :: norm
@@ -803,23 +800,19 @@
      real(dp), allocatable :: W(:)
      real(dp), allocatable :: eigval_allk(:, :), eigval_allk_mpi(:, :)
 
-     if (BerryCurvature_Cube_calc) then
-        n_kpoints=Nk1*Nk2*Nk3
-     else
-        n_kpoints= nk3_band 
-     endif
+     knv3=Nk1*Nk2*Nk3
 
      allocate(Vmn_wann(Num_wann, Num_wann, 3), Vmn_Ham(Num_wann, Num_wann, 3))
      allocate(Dmn_Ham(Num_wann,Num_wann,3), Vmn_Ham_nondiag(Num_wann, Num_wann, 3))
      allocate(W(Num_wann))
      allocate(UU(Num_wann, Num_wann))
-     allocate(eigval_allk(Num_wann, n_kpoints))
-     allocate(eigval_allk_mpi(Num_wann, n_kpoints))
+     allocate(eigval_allk(Num_wann, knv3))
+     allocate(eigval_allk_mpi(Num_wann, knv3))
      allocate( Omega_BerryCurv(Num_wann, 3), m_OrbMag(Num_wann, 3))
-     allocate( Omega_allk    (Num_wann, 3, n_kpoints))
-     allocate( Omega_allk_mpi(Num_wann, 3, n_kpoints))
-     allocate( m_OrbMag_allk    (Num_wann, 3, n_kpoints))
-     allocate( m_OrbMag_allk_mpi(Num_wann, 3, n_kpoints))
+     allocate( Omega_allk    (Num_wann, 3, knv3))
+     allocate( Omega_allk_mpi(Num_wann, 3, knv3))
+     allocate( m_OrbMag_allk    (Num_wann, 3, knv3))
+     allocate( m_OrbMag_allk_mpi(Num_wann, 3, knv3))
      Omega_BerryCurv= 0d0
      m_OrbMag=0d0
      
@@ -835,27 +828,19 @@
      call now(time_start0)
      time_start= time_start0
      time_end  = time_start0
-     do ik= 1+ cpuid, n_kpoints, num_cpu
+     do ik= 1+ cpuid, knv3, num_cpu
         if (cpuid==0.and. mod(ik/num_cpu, 100)==0) &
            write(stdout, '(a, i9, "  /", i10, a, f10.1, "s", a, f10.1, "s")') &
-           ' Berry curvature: ik', ik, n_kpoints, ' time left', &
-           (n_kpoints-ik)*(time_end- time_start)/num_cpu, &
+           ' Berry curvature: ik', ik, knv3, ' time left', &
+           (knv3-ik)*(time_end- time_start)/num_cpu, &
            ' time elapsed: ', time_end-time_start0 
-
-        !> if we calculate BC in the BZ, we generate kpoints in the BZ
-        if (BerryCurvature_Cube_calc) then
-           !> kbulk mode
-           ikx= (ik-1)/(nk2*nk3)+1
-           iky= ((ik-1-(ikx-1)*Nk2*Nk3)/nk3)+1
-           ikz= (ik-(iky-1)*Nk3- (ikx-1)*Nk2*Nk3)
-           k= K3D_start_cube+ K3D_vec1_cube*(ikx-1)/dble(nk1)  &
-              + K3D_vec2_cube*(iky-1)/dble(nk2)  &
-              + K3D_vec3_cube*(ikz-1)/dble(nk3) 
- 
-        elseif (BerryCurvature_kpath_sepband_calc) then
-           !> kpath mode
-           k= kpath_3d(:, ik)
-        endif
+        ikx= (ik-1)/(nk2*nk3)+1
+        iky= ((ik-1-(ikx-1)*Nk2*Nk3)/nk3)+1
+        ikz= (ik-(iky-1)*Nk3- (ikx-1)*Nk2*Nk3)
+        k= K3D_start_cube+ K3D_vec1_cube*(ikx-1)/dble(nk1)  &
+           + K3D_vec2_cube*(iky-1)/dble(nk2)  &
+           + K3D_vec3_cube*(ikz-1)/dble(nk3) 
+           !- (K3D_vec1_cube+ K3D_vec2_cube+ K3D_vec3_cube)/2d0
 
         call now(time_start)
         
@@ -872,7 +857,7 @@
         call get_Dmn_Ham(W, Vmn_Ham, Dmn_Ham)
         call get_Vmn_Ham_nondiag(Vmn_Ham, Vmn_Ham_nondiag)
 
-        call Berry_curvature_singlek_allbands(Dmn_Ham, Omega_BerryCurv)
+        call berry_curvarture_singlek_allbands(Dmn_Ham, Omega_BerryCurv)
         call orbital_magnetization_singlek_allbands(Dmn_Ham, Vmn_Ham_nondiag, m_OrbMag)
         Omega_allk(:, :, ik) = Omega_BerryCurv
         m_OrbMag_allk(:, :, ik) = m_OrbMag
@@ -893,7 +878,6 @@
      m_OrbMag_allk_mpi= m_OrbMag_allk
 #endif
 
-     IF (BerryCurvature_Cube_calc) THEN
      !> write out Berry curvature and orbital magnetization to a file which
      !> can be open by software Fermisurfer.
      outfileindex= outfileindex+ 1
@@ -906,12 +890,12 @@
         write(outfileindex, '(3f12.6)') Origin_cell%Kub
         write(outfileindex, '(3f12.6)') Origin_cell%Kuc
         do m=1, Num_wann
-           do ik= 1, n_kpoints
-              write(outfileindex, '(E18.10)') eigval_allk_mpi(m, ik)-iso_energy
+           do ik= 1, knv3
+              write(outfileindex, '(E18.10)') eigval_allk_mpi(m, ik)-E_arc
            enddo
         enddo
         do m=1, Num_wann
-           do ik= 1, n_kpoints
+           do ik= 1, knv3
               o1= Omega_allk_mpi(m, :, ik)/Angstrom2atomic**2
               write(outfileindex, '(E18.10)') norm(o1)
            enddo
@@ -932,12 +916,12 @@
         write(outfileindex, '(3f12.6)') Origin_cell%Kub
         write(outfileindex, '(3f12.6)') Origin_cell%Kuc
         do m=1, Num_wann
-           do ik= 1, n_kpoints
-              write(outfileindex, '(E18.10)') eigval_allk_mpi(m, ik)-iso_energy
+           do ik= 1, knv3
+              write(outfileindex, '(E18.10)') eigval_allk_mpi(m, ik)-E_arc
            enddo
         enddo
         do m=1, Num_wann
-           do ik= 1, n_kpoints
+           do ik= 1, knv3
               o1= Omega_allk_mpi(m, :, ik)/Angstrom2atomic**2
               write(outfileindex, '(E18.10)') o1(1)
            enddo
@@ -958,12 +942,12 @@
         write(outfileindex, '(3f12.6)') Origin_cell%Kub
         write(outfileindex, '(3f12.6)') Origin_cell%Kuc
         do m=1, Num_wann
-           do ik= 1, n_kpoints
-              write(outfileindex, '(E18.10)') eigval_allk_mpi(m, ik)-iso_energy
+           do ik= 1, knv3
+              write(outfileindex, '(E18.10)') eigval_allk_mpi(m, ik)-E_arc
            enddo
         enddo
         do m=1, Num_wann
-           do ik= 1, n_kpoints
+           do ik= 1, knv3
               o1= Omega_allk_mpi(m, :, ik)/Angstrom2atomic**2
               write(outfileindex, '(E18.10)') o1(3)
            enddo
@@ -982,12 +966,12 @@
         write(outfileindex, '(3f12.6)') Origin_cell%Kub
         write(outfileindex, '(3f12.6)') Origin_cell%Kuc
         do m=1, Num_wann
-           do ik= 1, n_kpoints
-              write(outfileindex, '(E18.10)') eigval_allk_mpi(m, ik)-iso_energy
+           do ik= 1, knv3
+              write(outfileindex, '(E18.10)') eigval_allk_mpi(m, ik)-E_arc
            enddo
         enddo
         do m=1, Num_wann
-           do ik= 1, n_kpoints
+           do ik= 1, knv3
               o1= m_OrbMag_allk_mpi(m, :, ik)
               write(outfileindex, '(E18.10)') norm(o1)
            enddo
@@ -1006,12 +990,12 @@
         write(outfileindex, '(3f12.6)') Origin_cell%Kub
         write(outfileindex, '(3f12.6)') Origin_cell%Kuc
         do m=1, Num_wann
-           do ik= 1, n_kpoints
-              write(outfileindex, '(E18.10)') eigval_allk_mpi(m, ik)-iso_energy
+           do ik= 1, knv3
+              write(outfileindex, '(E18.10)') eigval_allk_mpi(m, ik)-E_arc
            enddo
         enddo
         do m=1, Num_wann
-           do ik= 1, n_kpoints
+           do ik= 1, knv3
               o1= m_OrbMag_allk_mpi(m, :, ik)
               write(outfileindex, '(E18.10)') o1(3)
            enddo
@@ -1030,12 +1014,12 @@
         write(outfileindex, '(3f12.6)') Origin_cell%Kub
         write(outfileindex, '(3f12.6)') Origin_cell%Kuc
         do m=1, Num_wann
-           do ik= 1, n_kpoints
-              write(outfileindex, '(E18.10)') eigval_allk_mpi(m, ik)-iso_energy
+           do ik= 1, knv3
+              write(outfileindex, '(E18.10)') eigval_allk_mpi(m, ik)-E_arc
            enddo
         enddo
         do m=1, Num_wann
-           do ik= 1, n_kpoints
+           do ik= 1, knv3
               o1= m_OrbMag_allk_mpi(m, :, ik)
               write(outfileindex, '(E18.10)') o1(1)
            enddo
@@ -1043,88 +1027,6 @@
         close(outfileindex)
      endif
 
-     ELSE
-
-
-     !> output the Berry curvature to file
-     outfileindex= outfileindex+ 1
-     if (cpuid==0) then
-        open(unit=outfileindex, file='Berrycurvature_line_sepband.txt')
-        write(outfileindex, '(a)')'# Column 1 kpath with accumulated length in the kpath, Coloum 2: energy'
-        write(outfileindex, '(a)')'# Column 2-4 Berry curvature (Ang^2)'
-        write(outfileindex, "('#column', i5, 20i16)")(i, i=1, 8)
-        write(outfileindex, '(20a16)')'# k (1/A)', " eig", &
-           'Omega_x', 'Omega_y', 'Omega_z', &
-           'm_x', 'm_y', 'm_z'
-        do i=1, Num_wann
-           do ik=1, n_kpoints
-              write(outfileindex, '(200E16.6)')k3len(ik)*Angstrom2atomic, eigval_allk_mpi(i, ik)/eV2Hartree, &
-                 Omega_allk_mpi(i, :, ik), m_OrbMag_allk_mpi(i, :, ik)
-           enddo
-           write(outfileindex, *)' '
-        enddo
-        close(outfileindex)
- 
-
-        close(outfileindex)
-     endif
-
-     !> minimum and maximum value of energy bands
-     emin=  minval(eigval_allk_mpi)/eV2Hartree-0.5d0
-     emax=  maxval(eigval_allk_mpi)/eV2Hartree+0.5d0
-
-      !> write script for gnuplot
-     outfileindex= outfileindex+ 1
-     if (cpuid==0) then
-        open(unit=outfileindex, file='Berrycurvature_line_sepband.gnu')
-        write(outfileindex, '(a)') '# requirement: gnuplot version>5.4'
-        write(outfileindex, '(2a)') '# Please open the data file to check the data: Berrycurvature_line_sepband.txt  '
-        write(outfileindex, '(a)') 'set terminal pdf enhanced color font ",24"'
-        write(outfileindex,'(2a)') 'set palette defined ( 0  "green", ', &
-           '5 "yellow", 10 "red" )'
-        write(outfileindex, '(3a)')"set output 'Berrycurvature_line_sepband.pdf'"
-        write(outfileindex, '(a)')'set style data linespoints'
-        write(outfileindex, '(a)')'unset key'
-        write(outfileindex, '(a)')'set pointsize 0.8'
-        write(outfileindex, '(a)')'#set xtics font ",24"'
-        write(outfileindex, '(a)')'#set ytics font ",24"'
-        write(outfileindex, '(a)')'#set ylabel font ",24"'
-        write(outfileindex, '(a)')'set ylabel offset 0.5,0'
-        write(outfileindex, '(a)')'set border lw 2'
-        write(outfileindex, '(a, f10.5, a)')'set xrange [0: ', maxval(k3len*Angstrom2atomic), ']'
-        write(outfileindex, '(a,f12.6)')'emin=', emin
-        write(outfileindex, '(a,f12.6)')'emax=', emax
-        write(outfileindex, '(a)')' '
-        write(outfileindex, '(a)')'#set cbrange if the number is too large meeting some band crossings'
-        write(outfileindex, '(a)')'set cbrange [-100:100]'
-        write(outfileindex, '(a)')' '
-        if (index(Particle,'phonon')/=0) then
-           write(outfileindex, '(a)')'set yrange [0: emax]'
-           write(outfileindex, '(a)')'set ylabel "Frequency (THz)"'
-        else
-           write(outfileindex, '(a)')'set ylabel "Energy (eV)"'
-           write(outfileindex, '(a)')'set yrange [ emin : emax ]'
-        endif
-        write(outfileindex, 202, advance="no") (k3line_name(i), k3line_stop(i)*Angstrom2atomic, i=1, Nk3lines)
-        write(outfileindex, 203)k3line_name(Nk3lines+1), k3line_stop(Nk3lines+1)*Angstrom2atomic
-  
-        do i=1, Nk3lines-1
-           if (index(Particle,'phonon')/=0) then
-              write(outfileindex, 204)k3line_stop(i+1)*Angstrom2atomic, '0.0', k3line_stop(i+1)*Angstrom2atomic, 'emax'
-           else
-              write(outfileindex, 204)k3line_stop(i+1)*Angstrom2atomic, 'emin', k3line_stop(i+1)*Angstrom2atomic, 'emax'
-           endif
-        enddo
-        write(outfileindex, '(4a)')"plot 'Berrycurvature_line_sepband.txt' u 1:2:5 ",  &
-           " w lp lw 2 pt 7  ps 0.2 lc palette, 0 w l lw 2 dt 2"
-        close(outfileindex)
-     endif
-
-202 format('set xtics (',20('"',A3,'" ',F10.5,','))
-203 format(A3,'" ',F10.5,')')
-204 format('set arrow from ',F10.5,',',A5,' to ',F10.5,',',A5, ' nohead lw 2')
-
-     ENDIF
 
 
 #if defined (MPI)
@@ -1133,9 +1035,9 @@
 
      return
 
-  end subroutine berry_curvature_cube
+  end subroutine berry_curvarture_cube
 
-  subroutine Berry_curvature_plane_full
+  subroutine berry_curvarture_plane_full
      !> Calculate Berry curvature and orbital magnetization for the selected bands
      !> ref : Physical Review B 74, 195118(2006)
      !> eqn (34)
@@ -1224,7 +1126,7 @@
         k= kslice(:, ik)
 
         call now(time_start)
-        call Berry_curvature_orb_mag_singlek_allbands_pack(k, Omega_BerryCurv, m_OrbMag, W)
+        call berry_curvarture_orb_mag_singlek_allbands_pack(k, Omega_BerryCurv, m_OrbMag, W)
        
         do i=1, 3
            Omega_allk_Occ(1, i, ik) = sum(Omega_BerryCurv(1:NumOccupied, i))
@@ -1234,14 +1136,14 @@
         enddo
 
         !> consider the Fermi-distribution according to the broadening Earc_eta
-        if (Fermi_broadening<eps6) Fermi_broadening= eps6
-        beta_fake= 1d0/Fermi_broadening
+        if (Eta_Arc<eps6) Eta_Arc= eps6
+        beta_fake= 1d0/Eta_Arc
         do i=1, 3
            do m= 1, Num_wann
-              Omega_allk_EF(1, i, ik)= Omega_allk_EF(1, i, ik)+ Omega_BerryCurv(m, i)*fermi(W(m)-iso_energy, beta_fake)
-              m_OrbMag_allk_EF(1, i, ik)= m_OrbMag_allk_EF(1, i, ik)+ m_OrbMag(m, i)*fermi(W(m)-iso_energy, beta_fake)
-              Omega_allk_EF(2, i, ik)= Omega_allk_EF(2, i, ik)+ Omega_BerryCurv(m, i)*delta(Fermi_broadening, W(m)-iso_energy)
-              m_OrbMag_allk_EF(2, i, ik)= m_OrbMag_allk_EF(2, i, ik)+ m_OrbMag(m, i)*delta(Fermi_broadening, W(m)-iso_energy)
+              Omega_allk_EF(1, i, ik)= Omega_allk_EF(1, i, ik)+ Omega_BerryCurv(m, i)*fermi(W(m)-E_arc, beta_fake)
+              m_OrbMag_allk_EF(1, i, ik)= m_OrbMag_allk_EF(1, i, ik)+ m_OrbMag(m, i)*fermi(W(m)-E_arc, beta_fake)
+              Omega_allk_EF(2, i, ik)= Omega_allk_EF(2, i, ik)+ Omega_BerryCurv(m, i)*delta(Eta_arc, W(m)-E_arc)
+              m_OrbMag_allk_EF(2, i, ik)= m_OrbMag_allk_EF(2, i, ik)+ m_OrbMag(m, i)*delta(Eta_arc, W(m)-E_arc)
            enddo
         enddo
 
@@ -1515,9 +1417,9 @@
 
      return
 
-  end subroutine Berry_curvature_plane_full
+  end subroutine berry_curvarture_plane_full
 
-  subroutine Berry_curvature_orb_mag_singlek_allbands_pack(k, Omega_BerryCurv, m_OrbMag, W)
+  subroutine berry_curvarture_orb_mag_singlek_allbands_pack(k, Omega_BerryCurv, m_OrbMag, W)
      !> Calculate Berry curvature and orbital magnetization for the selected bands
      !> ref : Physical Review B 74, 195118(2006)
      !> eqn (34)
@@ -1575,19 +1477,19 @@
      call get_Dmn_Ham(W, Vmn_Ham, Dmn_Ham)
      call get_Vmn_Ham_nondiag(Vmn_Ham, Vmn_Ham_nondiag)
 
-     call Berry_curvature_singlek_allbands(Dmn_Ham, Omega_BerryCurv)
+     call berry_curvarture_singlek_allbands(Dmn_Ham, Omega_BerryCurv)
      call orbital_magnetization_singlek_allbands(Dmn_Ham, Vmn_Ham_nondiag, m_OrbMag)
 
      deallocate(Vmn_wann, Vmn_Ham, Vmn_Ham_nondiag)
      deallocate(UU, Dmn_Ham)
      return
 
-  end subroutine Berry_curvature_orb_mag_singlek_allbands_pack
+  end subroutine berry_curvarture_orb_mag_singlek_allbands_pack
 
 
 
 
-  subroutine Berry_curvature_plane_EF
+  subroutine berry_curvarture_plane_EF
      !> Calculate Berry curvature and orbital magnetization for the selected bands
      !> ref : Physical Review B 74, 195118(2006)
      !> eqn (34)
@@ -1698,7 +1600,7 @@
         call get_Dmn_Ham(W, Vmn_Ham, Dmn_Ham)
         call get_Vmn_Ham_nondiag(Vmn_Ham, Vmn_Ham_nondiag)
 
-        call Berry_curvature_singlek_allbands(Dmn_Ham, Omega_BerryCurv)
+        call berry_curvarture_singlek_allbands(Dmn_Ham, Omega_BerryCurv)
         call orbital_magnetization_singlek_allbands(Dmn_Ham, Vmn_Ham_nondiag, m_OrbMag)
         Omega_allk(:, :, ik) = Omega_BerryCurv
         m_OrbMag_allk(:, :, ik) = m_OrbMag
@@ -1796,11 +1698,11 @@
  
      return
 
-  end subroutine Berry_curvature_plane_EF
+  end subroutine berry_curvarture_plane_EF
 
 
 
-  subroutine Berry_curvature_plane_selectedbands
+  subroutine berry_curvarture_plane_selectedbands
      !> Calculate Berry curvature and orbital magnetization for the selected bands
      !> ref : Physical Review B 74, 195118(2006)
      !> eqn (34)
@@ -1911,7 +1813,7 @@
         call get_Dmn_Ham(W, Vmn_Ham, Dmn_Ham)
         call get_Vmn_Ham_nondiag(Vmn_Ham, Vmn_Ham_nondiag)
 
-        call Berry_curvature_singlek_allbands(Dmn_Ham, Omega_BerryCurv)
+        call berry_curvarture_singlek_allbands(Dmn_Ham, Omega_BerryCurv)
         call orbital_magnetization_singlek_allbands(Dmn_Ham, Vmn_Ham_nondiag, m_OrbMag)
         Omega_allk(:, :, ik) = Omega_BerryCurv
         m_OrbMag_allk(:, :, ik) = m_OrbMag
@@ -2009,11 +1911,11 @@
  
      return
 
-  end subroutine Berry_curvature_plane_selectedbands
+  end subroutine berry_curvarture_plane_selectedbands
 
 
 
-  subroutine Berry_curvature_plane
+  subroutine berry_curvarture_plane
      !> Calculate Berry curvature 
      !
      !> ref : Physical Review B 74, 195118(2006)
@@ -2088,11 +1990,11 @@
         Omega_y= 0d0
         Omega_z= 0d0
 
-        !call Berry_curvature_singlek_numoccupied_old(k, Omega_x, Omega_y, Omega_z)
+        !call berry_curvarture_singlek_numoccupied_old(k, Omega_x, Omega_y, Omega_z)
         if (Berrycurvature_EF_calc) then
-           call Berry_curvature_singlek_EF(k, iso_energy, Omega_x, Omega_y, Omega_z)
+           call berry_curvarture_singlek_EF(k, E_arc, Omega_x, Omega_y, Omega_z)
         else
-           call Berry_curvature_singlek_numoccupied_total(k, Omega_x(1), Omega_y(1), Omega_z(1))
+           call berry_curvarture_singlek_numoccupied_total(k, Omega_x(1), Omega_y(1), Omega_z(1))
         endif
         Omega(1, ik) = sum(Omega_x)
         Omega(2, ik) = sum(Omega_y)
@@ -2239,7 +2141,7 @@
  
      return
 
-  end subroutine Berry_curvature_plane
+  end subroutine berry_curvarture_plane
 
   subroutine Fourier_R_to_k(k, ham)
      !> Fourier transform the Hamiltonian from R space to k space
@@ -2369,8 +2271,8 @@
          ct=cos(theta)
          sp=sin(phi)
          cp=cos(phi)
-        !call Berry_curvature_singlek_numoccupied_old(k_direct, Omega_x, Omega_y, Omega_z)
-         call Berry_curvature_singlek_numoccupied    (k_direct, Omega_x, Omega_y, Omega_z)
+        !call berry_curvarture_singlek_numoccupied_old(k_direct, Omega_x, Omega_y, Omega_z)
+         call berry_curvarture_singlek_numoccupied    (k_direct, Omega_x, Omega_y, Omega_z)
          O_x= real(sum(Omega_x(1:Numoccupied)))
          O_y= real(sum(Omega_y(1:Numoccupied)))
          O_z= real(sum(Omega_z(1:Numoccupied)))
@@ -2514,7 +2416,7 @@
         sp=sin(phi)
         cp=cos(phi)
         rt= Rbig+ rsmall_a* ct
-        call Berry_curvature_singlek_numoccupied(k_direct, Omega_x, Omega_y, Omega_z)
+        call berry_curvarture_singlek_numoccupied(k_direct, Omega_x, Omega_y, Omega_z)
        !O_x= real(Omega_x(Numoccupied))
        !O_y= real(Omega_y(Numoccupied))
        !O_z= real(Omega_z(Numoccupied))

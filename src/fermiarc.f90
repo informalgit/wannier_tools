@@ -39,7 +39,6 @@
      real(dp) :: s0(3), s1(3)
      real(dp) :: K2D_vec_a(2), K2D_vec_b(2)
      real(dp) :: sx_bulk, sy_bulk, sz_bulk
-     real(dp) :: eta_broadening
 
      integer , allocatable :: ik12(:,:)
      real(dp), allocatable :: k12(:,:), k12_shape(:,:)
@@ -110,30 +109,24 @@
         sx_r_mpi=0d0; sy_r_mpi=0d0; sz_r_mpi=0d0
      endif
 
-     if (SlabQPI_kplane_calc) then
-        !> ceiling if K2D_vec are positive, floor if K2D_vec are negative
-        do i  = 1, 2
-            if (K2D_vec1(i)>0) then
-                  K2D_vec_a(i)= ceiling(K2D_vec1(i))
-            else
-                  K2D_vec_a(i)= floor(K2D_vec1(i))
-            endif
-   
-            if (K2D_vec2(i)>0) then
-               K2D_vec_b(i)= ceiling(K2D_vec2(i))
-            else
-               K2D_vec_b(i)= floor(K2D_vec2(i))
-            endif
-         enddo 
-         if (cpuid==0) then
-            write(stdout, '(a)')'WARNING : Your setting of KPLANE_SLAB has been modified because QPI calculation requires the information of the full BZ. '
-           write(outfileindex, '(a)') '# requirement: gnuplot version>5.4'
-            write(stdout, '((a, 2f8.4))')'The first modified vector in QPI: ', K2D_vec_a
-            write(stdout, '((a, 2f8.4))')'The second modified vector in QPI: ', K2D_vec_b
+     !> ceiling if K2D_vec are positive, floor if K2D_vec are negative
+     do i  = 1, 2
+         if (K2D_vec1(i)>0) then
+               K2D_vec_a(i)= ceiling(K2D_vec1(i))
+         else
+               K2D_vec_a(i)= floor(K2D_vec1(i))
          endif
-      else
-         K2D_vec_a= K2D_vec1
-         K2D_vec_b= K2D_vec2
+
+         if (K2D_vec2(i)>0) then
+            K2D_vec_b(i)= ceiling(K2D_vec2(i))
+         else
+            K2D_vec_b(i)= floor(K2D_vec2(i))
+         endif
+      enddo 
+      if (cpuid==0) then
+         write(stdout, '(a)')'WARNING : Your setting of KPLANE_SLAB has been modified because QPI calculation requires the information of the full BZ. '
+         write(stdout, '((a, 2f8.4))')'The first modified vector in QPI: ', K2D_vec_a
+         write(stdout, '((a, 2f8.4))')'The second modified vector in QPI: ', K2D_vec_b
       endif
 
 
@@ -190,8 +183,8 @@
        !endif
      endif
 
-     omega = iso_energy
-     eta_broadening= Fermi_broadening
+     omega = E_arc
+     eta= eta_arc
 
      !> deal with phonon system
      !> for phonon system, omega should be changed to omega^2
@@ -226,8 +219,8 @@
         ! the method in 1985 is better, you can find the ref in the
         ! subroutine
         call now(time1)
-        call surfgreen_1985(omega,GLL,GRR,GB,H00,H01,ones, eta_broadening)
-        ! call surfgreen_1984(omega,GLL,GRR,H00,H01,ones, eta_broadening)
+        call surfgreen_1985(omega,GLL,GRR,GB,H00,H01,ones)
+        ! call surfgreen_1984(omega,GLL,GRR,H00,H01,ones)
         call now(time2)
         time_ss= time_ss+time2-time1
 
@@ -489,7 +482,7 @@
 
      if (cpuid.eq.0)then
         write(stdout,*)'Ndim: ',ndim
-        write(stdout,*)'Nk1,Nk2,eta_broadening: ',nkx, nky, eta_broadening
+        write(stdout,*)'Nk1,Nk2,eta: ',nkx, nky, eta
         write(stdout,*)'Calculated surface density of state successfully'
      endif
 

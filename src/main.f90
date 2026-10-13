@@ -24,10 +24,8 @@
 ! version     2.6.1  At Beijing, China, April 10. 2022 clean for the Wannier90 tutorial 2022
 ! version     2.7.0  At IOP CAS Beijing, China, July 22. 2023, added ANE, SHC,
 !                    added symmetrization part for magnetic hamiltonian fixed several bugs
-! version     2.7.1  At IOP CAS Beijing, China, May 6 2024, try to build interface with openmx
-!                    to adapted the non-orthogonal basis; fixed several bugs
 !
-! Corresponding to Quansheng Wu: wuquansheng@gmail.com, quansheng.wu@iphy.ac.cn
+! Corresponding to : wuquansheng@gmail.com, quansheng.wu@iphy.ac.cn
 !
 ! License: GPL V3
 !--------+--------+--------+--------+--------+--------+--------+------!
@@ -48,7 +46,7 @@
 
 
      !> version of WannierTools
-     version='2.7.1'
+     version='2.7.0'
 
      ierr = 0
      cpuid= 0
@@ -77,72 +75,121 @@
         write(stdout, *)' '
      endif
 
-     !> readin the control parameters for this program
-     call now(time_start)
-     call readinput
-     call now(time_end)
-     call print_time_cost(time_start, time_end, 'readinput')
- 
-     !> set Num_wann from wt.in, Num_wann should be consistent with the hr.dat
-     Num_wann= sum(Origin_cell%nprojs)
-     if (SOC>0) num_wann= 2*num_wann
-  
-     !> We need to extend the spinless hamiltonian to spinfull hamiltonian if
-     !> we want to add Zeeman field when spin-orbit coupling is not included in 
-     !> the hr file.
-     if (Add_Zeeman_Field.and.SOC==0)then
-        Num_wann= Num_wann*2
-        if (cpuid==0) then
-           write(stdout,*)'>> Num_wann is doubled due to the consideration of Zeeman effect'
-           write(stdout,*)">> Num_wann : ", Num_wann
-        endif
-     endif
-  
-     !> dimension for slab BdG hamiltonians
-     Num_wann_BdG= 2*Num_wann     
+   !> readin the control parameters for this program
+   call readinput
 
+   !> determine whether you are using kp model or TB model
+   IF (index(KPorTB, 'KP')/=0) then
+      Num_wann= sum(Origin_cell%nprojs)
+      if (SOC>0) num_wann= 2*num_wann
+   ELSE  ! you are using TB model
+      !> open file Hmn_R.data to get Num_wann and Nrpts
+      if (cpuid.eq.0)then
+         write(stdout,*)''
+         inquire (file =Hrfile, EXIST = exists)
+         if (exists)then
+            !> the standard format defined by wannier90
+            if (index(Hrfile, 'HWR')==0) then
+               write(stdout,'(2x,a,a,a)')'File ',trim(Hrfile), &
+                  ' exist, We are using HmnR from wannier90'
+               open(unit=1001,file=Hrfile,status='old')
+               read(1001,*)
+               !> for sparse hr format, this line is the number of non-zero lines
+               if(Is_Sparse_Hr) read(1001,*)
+               read(1001,*) Num_wann
+               read(1001,*) Nrpts
+               write(stdout,*)'>> Num_wann', Num_wann
+               write(stdout,*)'>> NRPTS', NRPTS
+               close(1001)
+            !> the format defined by OpenMX
+            else
+               write(stdout,'(2x, 3a)')'File ',trim(Hrfile), &
+                  ' exist, We are using HmnR from HWR'
+               open(unit=1001,file=Hrfile,status='old')
+               read(1001,*)
+               read(1001,'(a26, i3)')cht, Num_wann
+               read(1001,'(a32,i10)')cht,Nrpts
+               write(stdout,*)'>> Num_wann', Num_wann
+               write(stdout,*)'>> NRPTS', NRPTS
+               close(1001)
+            endif ! hwr or not
+         else
+            write(stdout,'(2x,a25)')'>>> Error : no HmnR input'
+            stop
+         endif ! exists or not
+
+         !> We need to extend the spinless hamiltonian to spinfull hamiltonian if
+         !> we want to add Zeeman field when spin-orbit coupling is not included in 
+         !> the hr file.
+         if (Add_Zeeman_Field.and.SOC==0)then
+            Num_wann= Num_wann*2
+            if (cpuid==0) then
+               write(stdout,*)'>> Num_wann is doubled due to the consideration of Zeeman effect'
+               write(stdout,*)">> Num_wann : ", Num_wann
+            endif
+         endif
+
+         if ((soc==0 .and. sum(Origin_cell%nprojs)/=Num_wann .and. .not.Add_Zeeman_Field) .or. &
+            (soc>0 .and. sum(Origin_cell%nprojs)/=Num_wann/2))then
+            print *, 'sum(Origin_cell%nprojs), num_wann, num_wann/2'
+            print *, sum(Origin_cell%nprojs), num_wann, num_wann/2
+            print *, "ERROR: Maybe the SOC tags in the SYSTEM is wrongly set"
+            stop "ERROR: the summation of all projectors times spin degeneracy is not equal to num_wann"
+         endif
+      endif ! cpuid
+
+      !> broadcast and Nrpts to every cpu
+#if defined (MPI)
+     call MPI_bcast(Num_wann,1,mpi_in,0,mpi_cmw,ierr)
+     call MPI_bcast(Nrpts,1,mpi_in,0,mpi_cmw,ierr)
+#endif
      !> dimension for surface green's function
      Ndim= Num_wann* Np
- 
-     !> Check the symmetry operator if Symmetry_Import_calc= T
-     call now(time_start)
-     call symmetry
-     call now(time_end)
-     call print_time_cost(time_start, time_end, 'symmetry')
-  
-  
-     if (cpuid==0)then
-        write(stdout,*) ' >> Begin to read Hmn_R.data'
-     endif
- 
-     !>> Read Hamiltonian
-     if(Is_HrFile) then
-        !> allocate necessary arrays for tight binding hamiltonians
-        !> normal hmnr file
-      !   if(.not. Is_Sparse_Hr) then
-        if(.not. Is_Sparse) then
-           !> for the dense hr file, we allocate HmnR
-           call readNormalHmnR()
-           if (.not.Orthogonal_Basis) call readNormalSmnR()
-           call get_hmnr_cell(Cell_defined_by_surface)
-           if (valley_projection_calc) call  read_valley_operator
-        !> sparse hmnr input
-        else
-           call readSparseHmnR()
 
-           !> read valley operator 
-           if (valley_projection_calc) call  readsparse_valley_operator
+      if (cpuid==0)then
+         write(stdout,*) ' >> Begin to read Hmn_R.data'
+      endif
 
-           !> for non-Orthogonal basis, we have to read the overlap matrix
-           if (.not.Orthogonal_Basis) call readsparse_overlap
-        end if
-     else
-        stop "We only support Is_HrFile=.true. for this version"
-     end if
-  
-     if (cpuid==0)then
-        write(stdout,*) ' << Read Hmn_R.data successfully'
-     endif
+      allocate(irvec(3,nrpts))
+      allocate(ndegen(nrpts))
+      irvec= 0
+      ndegen=1
+
+      if(Is_HrFile) then
+         !> allocate necessary arrays for tight binding hamiltonians
+         !> normal hmnr file
+         if(.not. Is_Sparse_Hr) then
+            !> for the dense hr file, we allocate HmnR
+            allocate(HmnR(num_wann,num_wann,nrpts))
+            HmnR= 0d0
+            call readNormalHmnR()
+            if (valley_projection_calc) call  read_valley_operator
+         !> sparse hmnr input
+         else
+            call readSparseHmnR()
+            if (valley_projection_calc) call  readsparse_valley_operator
+
+         end if
+      else
+         stop "We only support Is_HrFile=.true. for this version"
+      end if
+
+      if (cpuid==0)then
+         write(stdout,*) ' << Read Hmn_R.data successfully'
+      endif
+
+     !> broadcast data to every cpu
+#if defined (MPI)
+     !call MPI_bcast(irvec,size(irvec),mpi_in,0,mpi_cmw,ierr)
+     !call MPI_bcast(HmnR,size(HmnR),mpi_dc,0,mpi_cmw,ierr)
+     !call MPI_bcast(ndegen,size(ndegen),mpi_in,0,mpi_cmw,ierr)
+#endif
+
+     ENDIF  ! end if the choice of kp model or TB model
+
+   !> import symmetry
+   call symmetry
+
 
    !> unfold bulk band line mode
    if (BulkBand_unfold_line_calc) then
@@ -172,13 +219,14 @@
       if(cpuid.eq.0)write(stdout, *)' '
       if(cpuid.eq.0)write(stdout, *)'>> Start of calculating bulk band'
       call now(time_start)
-      if (Is_Sparse) then
-      ! if (Is_Sparse_Hr) then
+      if (Is_Sparse_Hr) then
+#if defined (INTELMKL)
          if (valley_projection_calc) then
             call sparse_ekbulk_valley
          else
             call sparse_ekbulk
          endif
+#endif
       else
          if (valley_projection_calc) then
             call ek_bulk_line_valley
@@ -212,7 +260,9 @@
       call now(time_start)
 
       if (Is_Sparse_Hr) then
+#if defined (INTELMKL)
          call sparse_ekbulk_plane
+#endif
       else
          call ek_bulk_plane
       endif
@@ -228,7 +278,9 @@
       if(cpuid.eq.0)write(stdout, *)' '
       if(cpuid.eq.0)write(stdout, *)'>> Start of calculating Landau level spectrum'
       call now(time_start)
+#if defined (INTELMKL)
       call LandauLevel_B_dos_Lanczos
+#endif
       call now(time_end)
       call print_time_cost(time_start, time_end, 'LandauLevel_B_dos_calc')
       if(cpuid.eq.0)write(stdout, *)'<< End of calculating Landau level spectrum'
@@ -239,7 +291,9 @@
       if(cpuid.eq.0)write(stdout, *)' '
       if(cpuid.eq.0)write(stdout, *)'>> Start of calculating Landau level spectrum'
       call now(time_start)
+#if defined (INTELMKL)
       call LandauLevel_k_dos_Lanczos
+#endif
       call now(time_end)
       call print_time_cost(time_start, time_end, 'LandauLevel_k_dos_calc')
       if(cpuid.eq.0)write(stdout, *)'<< End of calculating Landau level spectrum'
@@ -250,8 +304,10 @@
       if(cpuid.eq.0)write(stdout, *)'>> start of calculating the Hofstader butterfly '
       call now(time_start)
       if (Is_HrFile) then
-         if(Is_Sparse_Hr.or.Num_wann*Magq>4000) then
+         if(Is_Sparse_Hr) then
+#if defined (INTELMKL)
             call sparse_landau_level_B
+#endif
          else
             call landau_level_B
          end if
@@ -283,7 +339,9 @@
       call now(time_start)
       if (Is_HrFile) then
          if(Is_Sparse_Hr.or.Num_wann*Magq>2000) then
+#if defined (INTELMKL)
             call sparse_landau_level_k
+#endif
          else
             call landau_level_k
          endif
@@ -362,16 +420,6 @@
         if(cpuid.eq.0)write(stdout, *)'<< End of calculating the bulk FS'
      endif
 
-     if (Dos_slab_calc) then
-        if(cpuid.eq.0)write(stdout, *)' '
-        if(cpuid.eq.0)write(stdout, *)'>> Start of calculating DOS for slab system'
-        call now(time_start)
-        call dos_slab
-        call now(time_end)
-        call print_time_cost(time_start, time_end, 'Dos_calc and Jdos_calc')
-        if(cpuid.eq.0)write(stdout, *)'<< End of calculating the DOS for slab system'
-     endif
- 
      !> calculate density of state and joint density of state
      if (JDos_calc.and.Dos_calc) then
         if(cpuid.eq.0)write(stdout, *)' '
@@ -386,10 +434,12 @@
            if(cpuid.eq.0)write(stdout, *)' '
            if(cpuid.eq.0)write(stdout, *)'>> Start of calculating DOS for bulk system'
            call now(time_start)
-           if(.not. Is_Sparse) then
+           if(.not. Is_Sparse_Hr) then
               call dos_sub
            else
+#if defined (INTELMKL)
               call dos_sparse
+#endif     
            end if
            call now(time_end)
            call print_time_cost(time_start, time_end, 'Dos_calc')
@@ -471,8 +521,10 @@
         if(cpuid.eq.0)write(stdout, *)' '
         if(cpuid.eq.0)write(stdout, *)'>> Start of calculating the slab band structure'
         call now(time_start)
-        if (Is_Sparse) then
+        if (Is_Sparse_Hr) then
+#if defined (INTELMKL)
           call ek_slab_sparseHR
+#endif
         else
            call ek_slab
         endif
@@ -481,35 +533,11 @@
         if(cpuid.eq.0)write(stdout, *)'<< End of calculating the slab band structure'
      endif
 
-     !> slab band BdG
-     if (SlabBdG_calc)then
-        if(cpuid.eq.0)write(stdout, *)' '
-        if(cpuid.eq.0)write(stdout, *)'>> Start of calculating the slab BdG band structure'
-        call now(time_start)
-        call ek_slab_BdG
-        call now(time_end)
-        call print_time_cost(time_start, time_end, 'SlabBand')
-        if(cpuid.eq.0)write(stdout, *)'<< End of calculating the slab BdG band structure'
-     endif     
-
-     !> BdG phase
-     if (BdG_phase_calc)then
-        if(cpuid.eq.0)write(stdout, *)' '
-        if(cpuid.eq.0)write(stdout, *)'>> Start of calculating the slab BdG Phase diagram'
-        call now(time_start)
-        call ek_slab_BdG_phase
-        call now(time_end)
-        call print_time_cost(time_start, time_end, 'SlabBand')
-        if(cpuid.eq.0)write(stdout, *)'<< End of calculating the slab BdG Phase diagram'
-     endif
-
-
-
      if (BerryCurvature_slab_calc)then
         if(cpuid.eq.0)write(stdout, *)' '
         if(cpuid.eq.0)write(stdout, *)'>> Start of calculating the Berry curvature for a slab system'
         call now(time_start)
-        call Berry_curvature_slab
+        call berry_curvarture_slab
         call now(time_end)
         call print_time_cost(time_start, time_end, 'BerryCurvature_slab')
         if(cpuid.eq.0)write(stdout, *)'End of calculating the Berry curvature for a slab system'
@@ -519,7 +547,7 @@
         if(cpuid.eq.0)write(stdout, *)' '
         if(cpuid.eq.0)write(stdout, *)'>> Start of calculating the Berry curvature'
         call now(time_start)
-        call Berry_curvature_line_occupied
+        call berry_curvarture_line
         call now(time_end)
         call print_time_cost(time_start, time_end, 'BerryCurvature')
         if(cpuid.eq.0)write(stdout, *)'End of calculating the Berry curvature'
@@ -529,17 +557,17 @@
         if(cpuid.eq.0)write(stdout, *)' '
         if(cpuid.eq.0)write(stdout, *)'>> Start of calculating the Berry curvature'
         call now(time_start)
-        call Berry_curvature_plane_full
+        call berry_curvarture_plane_full
         call now(time_end)
         call print_time_cost(time_start, time_end, 'BerryCurvature')
         if(cpuid.eq.0)write(stdout, *)'End of calculating the Berry curvature'
      endif
 
-     if (BerryCurvature_Cube_calc .or. BerryCurvature_kpath_sepband_calc)then
+     if (BerryCurvature_Cube_calc)then
         if(cpuid.eq.0)write(stdout, *)' '
         if(cpuid.eq.0)write(stdout, *)'>> Start of calculating the Berry curvature in a k-cube'
         call now(time_start)
-        call Berry_curvature_cube
+        call berry_curvarture_cube
         call now(time_end)
         call print_time_cost(time_start, time_end, 'BerryCurvature_Cube')
         if(cpuid.eq.0)write(stdout, *)'End of calculating the Berry curvature in a cube'
@@ -569,7 +597,7 @@
 
 
      !> wannier center calculate
-     if (Wilsonloop_calc)then
+     if (wanniercenter_calc)then
         if(cpuid.eq.0)write(stdout, *)' '
         if(cpuid.eq.0)write(stdout, *)'>> Start of calculating the Wilson loop'
         call now(time_start)
@@ -577,26 +605,6 @@
         call now(time_end)
         call print_time_cost(time_start, time_end, 'WannierCenter')
         if(cpuid.eq.0)write(stdout, *)'<< End of calculating the Wilson loop'
-     endif
-
-     !> Slab BdG wannier center calculate
-     if (BdGChern_calc)then
-        if(cpuid.eq.0)write(stdout, *)' '
-        if(cpuid.eq.0)write(stdout, *)'>> Start of calculating the Wilson loop for Slab BdG'
-        call now(time_start)
-        call wannier_center2D_BdG   ! tmp added by luoay at 2022/04/02
-        call now(time_end)
-        call print_time_cost(time_start, time_end, 'WannierCenterBdG')
-        if(cpuid.eq.0)write(stdout, *)'<< End of calculating the Wilson loop'
-     endif
-     if (Intra_orbital_hall_calc)then
-        if(cpuid.eq.0)write(stdout, *)' '
-        if(cpuid.eq.0)write(stdout, *)'>> Start of calculating the Intra_orbital_hall_calc! '
-        call now(time_start)
-        call Intra_Orbital_hall_conductivity
-        call now(time_end)
-        call print_time_cost(time_start, time_end, 'Intra_orbital_hall_calc')
-        if(cpuid.eq.0)write(stdout, *)'<< End of calculating the Intra_orbital_hall_calc!'
      endif
 
      !> mirror chern number calculation
@@ -688,6 +696,50 @@
         if(cpuid.eq.0)write(stdout, *)'End of SHC calculation'
      endif
 
+     !> calculate orbital hall conductivity
+     if (OHC_calc)then
+        if(cpuid.eq.0)write(stdout, *)' '
+        if(cpuid.eq.0)write(stdout, *)'>> Start to calculate orbital hall conductivity'
+        call now(time_start)
+        call sigma_OHC
+        call now(time_end)
+        call print_time_cost(time_start, time_end, 'OHC_calc')
+        if(cpuid.eq.0)write(stdout, *)'End of OHC calculation'
+     endif
+
+     !> calculate total orbital hall conductivity (modern theory, PRB 106, 104414)
+     if (OHC_tot_calc)then
+        if(cpuid.eq.0)write(stdout, *)' '
+        if(cpuid.eq.0)write(stdout, *)'>> Start to calculate total orbital hall conductivity'
+        call now(time_start)
+        call sigma_OHC_tot
+        call now(time_end)
+        call print_time_cost(time_start, time_end, 'OHC_tot_calc')
+        if(cpuid.eq.0)write(stdout, *)'End of total OHC calculation'
+     endif
+
+     !> orbital moments and orbital Berry curvature along KPATH_BULK
+     if (OrbitalMoment_kpath_calc)then
+        if(cpuid.eq.0)write(stdout, *)' '
+        if(cpuid.eq.0)write(stdout, *)'>> Start orbital-moment calculation along KPATH_BULK'
+        call now(time_start)
+        call orbital_moment_kpath
+        call now(time_end)
+        call print_time_cost(time_start, time_end, 'OrbitalMoment_kpath_calc')
+        if(cpuid.eq.0)write(stdout, *)'End orbital-moment calculation along KPATH_BULK'
+     endif
+
+     !> calculate <Sz> expectation value over a 2D k plane in the BZ
+     if (Sz_expectation_calc)then
+        if(cpuid.eq.0)write(stdout, *)' '
+        if(cpuid.eq.0)write(stdout, *)'>> Start to calculate <Sz> expectation value over a 2D k plane'
+        call now(time_start)
+        call Sz_expectation
+        call now(time_end)
+        call print_time_cost(time_start, time_end, 'Sz_expectation_calc')
+        if(cpuid.eq.0)write(stdout, *)'End of <Sz> expectation value calculation'
+     endif
+
      !> calculate anomalouls hall conductivity
      if (AHC_calc)then
         if(cpuid.eq.0)write(stdout, *)' '
@@ -776,29 +828,6 @@
         call print_time_cost(time_start, time_end, 'SlabSpintexture')
         if(cpuid.eq.0)write(stdout, *)'End of calculating the spin texture for surface'
      endif
-
-     !> calculate the linear optical conductivity 
-     if (linear_optic_calc)then
-      if(cpuid.eq.0)write(stdout, *)' '
-      if(cpuid.eq.0)write(stdout, *)'>> Start of calculating the linear optical conductivity'
-      call now(time_start)
-      call linear_optic
-      call now(time_end)
-      call print_time_cost(time_start, time_end, 'linear_optic_calc')
-      if(cpuid.eq.0)write(stdout, *)'End of calculating the linear optical conductivity'
-   endif
-
-
-     !> calculate the the bulk photovotaic effect 
-     if (BPVE_calc)then
-      if(cpuid.eq.0)write(stdout, *)' '
-      if(cpuid.eq.0)write(stdout, *)'>> Start of calculating the bulk photovotaic effect'
-      call now(time_start)
-      call bulk_photovoltaic
-      call now(time_end)
-      call print_time_cost(time_start, time_end, 'BPVE_calc')
-      if(cpuid.eq.0)write(stdout, *)'End of calculating the bulk photovotaic effect'
-   endif
 
      call now(time_end)
 

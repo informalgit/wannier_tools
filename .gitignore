@@ -5,3 +5,7 @@
 */*/*~
 */*/sigma*dat
 */*/rho*dat
+
+# compiled binary
+bin/wt.x
+src/wt.x

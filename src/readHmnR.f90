@@ -21,7 +21,7 @@ subroutine readNormalHmnR()
    integer :: n, m, ir0
    integer :: add_electric_field
    integer :: nwann, nwann_nsoc
-   integer :: stat, idx, nRused
+
    real(dp) :: static_potential
    real(dp) :: tot, rh, ih
    real(dp) :: pos(Origin_cell%Num_atoms)
@@ -39,118 +39,45 @@ subroutine readNormalHmnR()
 
    if (index(Hrfile, 'HWR')==0) then
       !> for Normal HmnR obtained from Wannier90 or sparse HmnR
-      if (.not. Is_Sparse_Hr) then
 
-         !> skip a comment line
-         read(12, *)
+      !> skip a comment line
+      read(12, *)
 
-         !> number of Wannier orbitals in the hr file
-         nwann=0
-         read(12, *)nwann
-         if (nwann==0) then
-            stop "ERROR : num_wann is zero in hr file"
-         endif
-         nwann_nsoc=nwann
-         if (SOC>0) nwann_nsoc= nwann/2
-
-         if ((soc==0 .and. sum(Origin_cell%nprojs)/=nwann .and. .not.Add_Zeeman_Field) .or. &
-         (soc>0 .and. sum(Origin_cell%nprojs)/=nwann/2))then
-         print *, 'sum(Origin_cell%nprojs), num_wann, num_wann/2'
-         print *, sum(Origin_cell%nprojs), nwann, nwann/2
-         print *, "ERROR: Maybe the SOC tags in the SYSTEM is wrongly set"
-         stop "ERROR: the summation of all projectors times spin degeneracy is not equal to num_wann"
-         endif
-   
-         !> number of lattice vectors taken into account
-         read(12, *)Nrpts
-         if (.not. allocated(HmnR)) allocate(HmnR(Num_wann,Num_wann,nrpts))
-         allocate(irvec(3,nrpts))
-         allocate(ndegen(nrpts))
-         irvec= 0
-         ndegen=1
-
-         !> The degeneracy of each R point, this is caused by the Fourier transform in the Wigner-Seitz cell
-         read(12, *)(ndegen(i), i=1, Nrpts)
-      else
-         !> for Sparse HmnR
-         !> skip a comment line
-         read(12, *)
-         read(12,*) splen_input   !> number of non-zeros lines
-         if (splen_input<=0) then
-            stop "ERROR : splen_input is zero in hr file"
-         endif
-
-         !> 读取 Wannier 轨道数
-         read(12, *) nwann
-         if (nwann /= Num_wann) then
-            write(*, *) '>>> ERROR: Num_wann mismatch in Hr file: ', nwann, ' vs ', Num_wann
-            stop
-         endif
-         nwann_nsoc = nwann
-         if (SOC > 0) nwann_nsoc = nwann/2
-
-         !> 读取 R 点个数
-         read(12, *) Nrpts
-         if (.not. allocated(HmnR)) allocate(HmnR(Num_wann,Num_wann,nrpts))
-         allocate(irvec(3, Nrpts))
-         allocate(ndegen(Nrpts))
-         ndegen = 1
+      !> number of Wannier orbitals in the hr file
+      nwann=0
+      read(12, *)nwann
+      if (nwann==0) then
+         stop "ERROR : num_wann is zero in hr file"
       endif
+      nwann_nsoc=nwann
+      if (SOC>0) nwann_nsoc= nwann/2
 
-      nRused = 0
-      do 
-         read(12,*,iostat=stat) i1, i2, i3, i4, i5, rh, ih
-         if (stat<0) exit   ! EOF
-         if (stat>0) stop "格式错误"
-         !—— 1) 在已有 R 点中查找 ——
-         idx = 0
-         do j = 1, nRused
-            if (irvec(1,j)==i1 .and. irvec(2,j)==i2 .and. irvec(3,j)==i3) then
-               idx = j
-               exit
-            end if
-         end do
-      
-         !—— 2) 如果没找到，就新增一个 R 点 ——
-         if (idx == 0) then
-            nRused = nRused + 1
-            idx = nRused
-            irvec(:,idx) = (/ i1, i2, i3 /)
-            ! write(*, '(a, i5, a, i5, a, i5)') 'New R point found: i1 =', i1, ', i2=', i2, ', i3=', i3
-         end if
-      
-         !—— 3) 填写 overlap 矩阵 ——
-         HmnR(i4, i5, idx) = dcmplx(rh, ih)
+      !> number of lattice vectors taken into account
+      read(12, *)Nrpts
 
-      end do
-
-      ! ir=0
-      ! do ir=1,Nrpts
-      !    do n=1,nwann
-      !       do m=1,nwann
-      !          read(12,*,end=1001)i1, i2, i3, i4, i5, rh, ih
-      !          irvec(1,ir)=i1
-      !          irvec(2,ir)=i2
-      !          irvec(3,ir)=i3
-      !          HmnR(i4,i5,ir)=dcmplx(rh,ih)
-      !       end do
-      !    enddo
-      ! enddo
+      !> The degeneracy of each R point, this is caused by the Fourier transform in the Wigner-Seitz cell
+      read(12, *)(ndegen(i), i=1, Nrpts)
+      ir=0
+      do ir=1,Nrpts
+         do n=1,nwann
+            do m=1,nwann
+               read(12,*,end=1001)i1, i2, i3, i4, i5, rh, ih
+               irvec(1,ir)=i1
+               irvec(2,ir)=i2
+               irvec(3,ir)=i3
+               HmnR(i4,i5,ir)=dcmplx(rh,ih)
+            end do
+         enddo
+      enddo
 
       !> extract the fermi energy
-      if (Orthogonal_Basis) then
-         do iR=1,Nrpts
-            if (Irvec(1,iR).eq.0.and.Irvec(2,iR).eq.0.and.Irvec(3,iR).eq.0)then
-               do i=1, Num_wann
-                  HmnR(i,i,iR)=HmnR(i,i,iR)-E_fermi
-                  ! write(*, '(a, 5i5, a, f18.7)') 'HmnR at R=0', iR, i, irvec(:,iR), ' is ', HmnR(i,i,iR)
-               enddo
-            endif
-         enddo
-      endif
-
-      !直接结束所有程序
-      ! stop "ERROR: Orthogonal_Basis is not supported in this version of Wannier90"
+      do iR=1,Nrpts
+         if (Irvec(1,iR).eq.0.and.Irvec(2,iR).eq.0.and.Irvec(3,iR).eq.0)then
+            do i=1, Num_wann
+               HmnR(i,i,iR)=HmnR(i,i,iR)-E_fermi
+            enddo
+         endif
+      enddo
       !> WannierTools codes use Hatree atomic units
       if (index(Particle,'phonon')/=0) then
          HmnR= HmnR*eV2Hartree*eV2Hartree ! from eV to Hartree
@@ -218,6 +145,7 @@ subroutine readNormalHmnR()
    !> change from "up dn up dn" to "up up dn dn"
    if (index( Package, 'QE')/=0.or.index( Package, 'quantumespresso')/=0 &
          .or.index( Package, 'quantum-espresso')/=0.or.index(Package, 'VASP6')/=0.or.index( Package, 'pwscf')/=0) then
+      write(stdout, *) '>>reordering wannierbasis...from "up dn up dn" to "up up dn dn"...'
       call reorder_wannierbasis
 
       if (cpuid==0.and.export_newhr) then
@@ -241,11 +169,6 @@ subroutine readNormalHmnR()
       endif
    endif
 
-   !> get the ir index that the R(ir)=(0, 0, 0)
-   ir0=0
-   do ir=1, nrpts
-      if (irvec(1, ir)==0.and.irvec(2, ir)==0.and.irvec(3, ir)==0) ir0=ir
-   enddo
 
    !> Adding zeeman field
    !> Bx=Bdirection(1)
@@ -254,12 +177,23 @@ subroutine readNormalHmnR()
    !> Hz= Zeeman_energy_in_eV*(Bx*sx+By*sy+Bz*sz)/2d0
    !> sx, sy, sz are Pauli matrices.
    if (Add_Zeeman_Field) then
-      call add_zeeman_normal_hr()
+      if (abs(Zeeman_energy_in_eV)<eps6)then
+         Zeeman_energy_in_eV= Bmagnitude*Effective_gfactor*Bohr_magneton
+         if (cpuid==0)then
+            write(stdout, '(1x, a, 3f16.6)')"Zeeman_energy_in_eV: ",  Zeeman_energy_in_eV/eV2Hartree
+         endif
+      endif
+
       !> After considering the Zeeman field, we already extended the spin space to spin-full.
       SOC = 1
    endif ! Add_Zeeman_Field
 
+
    call get_stacking_direction_and_pos(add_electric_field, pos)
+   ir0=0
+   do ir=1, nrpts
+      if (irvec(1, ir)==0.and.irvec(2, ir)==0.and.irvec(3, ir)==0) ir0=ir
+   enddo
  
    if (add_electric_field>0) then
      io=0
@@ -284,224 +218,24 @@ subroutine readNormalHmnR()
    endif  ! add electric field or not
 
    !> write out Hmn(R=0)
-   if (cpuid.eq.0 .and. Num_wann< 300)then
+   if (cpuid.eq.0)then
       write(stdout, '(a)')" "
-      write(stdout, '(a)')" >> Hopping parameters in the home unit cell"
       write(stdout, '(a)')" >> H00= Hmn(R=0) real part"
       do i=1, Num_wann
-         write(stdout, '(50000f7.3)') real(HmnR(i, :, ir0))/eV2Hartree
+         write(stdout, '(50000f6.2)') real(HmnR(i, :, ir0))/eV2Hartree
       enddo
       write(stdout, '(a)')" "
       write(stdout, '(a)')" >> H00= Hmn(R=0) imagary part"
       do i=1, Num_wann
-         write(stdout, '(50000f7.3)') aimag(HmnR(i, :, ir0))/eV2Hartree
+         write(stdout, '(50000f6.2)') aimag(HmnR(i, :, ir0))/eV2Hartree
       enddo
       write(stdout, '(a)')" "
    endif
 
-   ! call get_hmnr_cell(Cell_defined_by_surface)
+   call get_hmnr_cell(Cell_defined_by_surface)
 
    return
 end subroutine readNormalHmnR
-
-
-subroutine read_OAM_operator(Lx_wann, Ly_wann, Lz_wann)
-   !>> Read in the valley operator from valley_operator.dat
-   ! Constructed by quansheng wu 04 Nov. 2023
-   ! License: GPL V3
-
-   use para
-
-   implicit none
-
-
-   integer :: n, m, ir0
-   integer :: add_electric_field
-   integer :: nwann, nwann_nsoc
-   logical :: exists
-
-
-
-   integer :: i, j, ios
-   real :: re, im
-   character(len=2) :: current_matrix
-   character(len=256) :: line
-
-   complex(dp), intent(out) :: Lx_wann(num_wann, num_wann), Ly_wann(num_wann, num_wann), Lz_wann(num_wann, num_wann)
-
-   !allocate(Lx_wann(num_wann, num_wann))
-   !allocate(Ly_wann(num_wann, num_wann))
-   !allocate(Lz_wann(num_wann, num_wann))
-
-   if(cpuid.eq.0)write(stdout,*)'****************OAM******************** '
-   inquire (file ="oam.dat", EXIST = exists)
-   if (exists)then
-      write(stdout,*)'****************OAM******************** '
-      open(12, file="oam.dat", status='OLD', iostat = ios)
-      !if (ios /= 0) then
-      !  write(*,*) "Error opening file!"
-      !  stop
-      !end if
-   else
-      STOP ">> for OAM projection , you have to prepare a file oam.dat"
-   endif
-
-
-   
-   !Lx_wann = 0
-   !Ly_wann = 0
-   !Lz_wann = 0
-   read(12,*) nwann
-   write(stdout,*) 'num_wann_OAM', num_wann
-   do
-        read(12, '(A)', iostat=ios) line
-        if (ios /= 0) exit
-
-        ! 检查是否是矩阵标识行
-        if (line(1:2) == 'Lx' .or. line(1:2) == 'Ly' .or. line(1:2) == 'Lz') then
-            current_matrix = line(1:2)
-            cycle
-        end if
-
-        ! 跳过空行
-        if (len_trim(line) == 0) cycle
-
-        ! 读取数据行
-        read(line, *, iostat=ios) i, j, re, im
-        write(stdout,*) i,j,re,im
-        if (ios /= 0) then
-            write(*,*) "Error reading line:", trim(line)
-            cycle
-        end if
-
-
-         if (current_matrix == 'Lx') then
-                Lx_wann(i,j) = cmplx(re, im)
-         else if (current_matrix == 'Ly') then
-                Ly_wann(i,j) = cmplx(re, im)
-         else if (current_matrix == 'Lz') then
-                Lz_wann(i,j) = cmplx(re, im)
-         else
-            write(*,*) "Unknown matrix identifier:", current_matrix
-        end if
-    end do
-
-
-
-
-   !1001 continue
-   close(12)
-
-   do i=1,num_wann
-      do j=1,num_wann
-      if (abs(Lx_wann(i,j))>0.0001) write(stdout,*) i,j, Lx_wann(i,j)
-      enddo
-   enddo
-
-   if (cpuid.eq.0) write(stdout, *) ">>> finished reading of OAM operator"
-
-end subroutine read_OAM_operator
-
-subroutine readNormalSmnR()
-   !>> Read in the overlap matrix from wannier90_sr.dat
-   !>  The format is defined by the Wannier90 software
-   !  Constructed by quansheng wu 4/2/2010
-   !  Modified for overlap (SmnR)
-
-   use para
-   implicit none
-
-   integer :: ir, n, m, i, j, k, idx, nRused
-   integer :: i1, i2, i3, i4, i5
-   integer :: nwann, nwann_nsoc
-   real(dp) :: rh, ih
-   ! complex(dp), allocatable :: SmnR(:,:,:)  ! overlap matrix
-   logical :: exists
-
-   if(cpuid.eq.0)write(stdout,*)' '
-   if(cpuid.eq.0)write(stdout,'(2a)')' >> Now we are reading the overlap files: ', trim(adjustl(Overlapfile))
-   inquire(file= Overlapfile, EXIST = exists)
-   if (exists)then
-      open(13, file= Overlapfile, status='OLD')
-   else
-      STOP ">> for non-orthogonal basis , you have to prepare a file like overlap.dat"
-   endif
-
-   if(.not. Is_Sparse_Hr) then
-      write(*, *) '>>> ERROR: The overlap file is not sparse. Please use the sparse format.'
-      stop
-   else
-      !> 跳过注释行
-      read(13, *) 
-      
-      read(13,*) splen_overlap_input   !> number of non-zeros lines
-
-      !> 读取 Wannier 轨道数
-      read(13, *) nwann
-      if (nwann /= Num_wann) then
-         write(*, *) '>>> ERROR: Num_wann mismatch in Sr file: ', nwann, ' vs ', Num_wann
-         stop
-      endif
-      nwann_nsoc = nwann
-      if (SOC > 0) nwann_nsoc = nwann/2
-
-      !> 读取 R 点个数
-      read(13, *) Nrpts
-
-      !> 分配数组
-      allocate(SmnR(Num_wann, Num_wann, Nrpts))
-      ! allocate(irvec(3,    Nrpts))
-      ! allocate(ndegen(    Nrpts))
-
-      nRused = Nrpts
-      do k = 1, splen_overlap_input
-         read(13,*) i1, i2, i3, i4, i5, rh, ih
-      
-         !—— 1) 在已有 R 点中查找 ——
-         idx = 0
-         do j = 1, nRused
-            if (irvec(1,j)==i1 .and. irvec(2,j)==i2 .and. irvec(3,j)==i3) then
-               idx = j
-               exit
-            end if
-         end do
-
-         !—— 2) 如果没找到，就新增一个 R 点 ——
-         if (idx == 0) then
-            ! nRused = nRused + 1
-            ! idx = nRused
-            ! irvec(:,idx) = (/ i1, i2, i3 /)
-            ! write(*, '(a, i5, a, i5, a, i5)') 'New R point found: ', i1, i2, i3
-            stop "ERROR: R point not found in SmnR reading"
-         end if
-
-         !—— 3) 填写 overlap 矩阵 ——
-
-         SmnR(i4, i5, idx) = dcmplx(rh, ih)
-         if (i4 == i5) then
-            !打印i1,i2,i3,i4,i5以及值
-            ! write(*, '(a, 5i5, a, f18.7)') 'SmnR at R=', i1, i2, i3, i4, i5, ' is ', SmnR(i4, i5, idx)
-         endif
-      end do
-
-      do iR=1,Nrpts
-         if (Irvec(1,iR).eq.0.and.Irvec(2,iR).eq.0.and.Irvec(3,iR).eq.0)then
-            do i=1, Num_wann
-               !打印ir, i, SmnR(i, i, iR)
-               ! write(*, '(a, i5, a, i5, a, f18.7)') 'SmnR at R=0', iR, ' for i=', i, ' is ', SmnR(i, i, iR)
-            enddo
-         endif
-      enddo
-
-   endif
-
-
-
-   close(13)
-end subroutine readNormalSmnR
-
-
-
 
 subroutine read_valley_operator()
    !>> Read in the valley operator from valley_operator.dat
@@ -588,7 +322,7 @@ subroutine get_hmnr_cell(cell)
    real(dp) :: shift_vec_direct(3)
 
    !> for newcell
-   real(dp) :: apos1d(3),apos2d(3),apos1dprime(3),apos2dprime(3)
+   real(dp) :: apos1d(3),apos2d(3)
    !>count newcell nrpts
    integer :: max_ir
    integer :: nir1,nir2,nir3, ir_cell
@@ -600,9 +334,6 @@ subroutine get_hmnr_cell(cell)
    integer, allocatable :: allirs(:, :, :, :)
    integer :: irn1(3),irn2(3)
 
-   !> The Allocate Process
-   integer :: ia1,ia2,ia1prime,ia2prime
-
    max_ir=8
    nrpts_max=(2*max_ir+1)**3
    allocate( rpts_array(-max_ir:max_ir,-max_ir:max_ir,-max_ir:max_ir))
@@ -610,152 +341,109 @@ subroutine get_hmnr_cell(cell)
 
    allocate(allirs(nrpts, num_wann, num_wann, 3))
 
-   allocate(Rmn_old(3))
-   allocate(Rmn_new(3))
-   allocate(irvec_new(3))
-   allocate(irvec_new_int(3))
-
-   ! call cart_direct_real(shift_to_topsurface_cart, shift_vec_direct, cell%lattice)
+   call cart_direct_real(shift_to_topsurface_cart, shift_vec_direct, cell%lattice)
 
    call date_and_time(DATE=date_now,ZONE=zone_now, TIME=time_now)
    !> Get new Hrs
    rpts_array=0
-   nrpts_surfacecell=0
+   nrpts_new=0
    rpts_map= 0
 
-   !> 1. Get number of R points for the new cell
+   !> get number of R points for the new cell first 
    do ir=1, nrpts
-      do j=1, Num_wann
-         do i=1, Num_wann
-            ia1 = Origin_cell%spinorbital_to_atom_index(i)
-            ia2 = Origin_cell%spinorbital_to_atom_index(j)
-            apos1d = Origin_cell%Atom_position_direct(:, ia1)
-            apos2d = Origin_cell%Atom_position_direct(:, ia2)
+      do i=1, Num_wann
+         do j=1, Num_wann
+            apos1d= Origin_cell%wannier_centers_direct(:, i)- shift_vec_direct
+            apos2d= Origin_cell%wannier_centers_direct(:, j)- shift_vec_direct+irvec(:, ir)
+            call latticetransform(apos1d(1),apos1d(2),apos1d(3),new_ia,new_ib,new_ic)
+            irn1=floor([new_ia,new_ib,new_ic])
 
-            ia1prime = Cell_defined_by_surface%spinorbital_to_atom_index(i)
-            ia2prime = Cell_defined_by_surface%spinorbital_to_atom_index(j)
-            apos1dprime = Cell_defined_by_surface%Atom_position_direct(:,ia1prime)
-            apos2dprime = Cell_defined_by_surface%Atom_position_direct(:,ia2prime)
+            call latticetransform(apos2d(1),apos2d(2),apos2d(3),new_ia,new_ib,new_ic)
+            irn2=floor([new_ia,new_ib,new_ic])
 
-            Rmn_old = irvec(:, ir) + apos2d - apos1d
-            call latticetransform(Rmn_old(1),Rmn_old(2),Rmn_old(3),Rmn_new(1),Rmn_new(2),Rmn_new(3))
-            irvec_new = Rmn_new - (apos2dprime - apos1dprime)
-
-            !> Due to the accuracy of computing, need to rounding  (but always tiny)
-            irvec_new_int(1) = ANINT(irvec_new(1))
-            irvec_new_int(2) = ANINT(irvec_new(2))
-            irvec_new_int(3) = ANINT(irvec_new(3))
-
-            if (abs(irvec_new_int(1))>max_ir .or. abs(irvec_new_int(2))>max_ir .or. abs(irvec_new_int(3))>max_ir) cycle
-            rpts_array(irvec_new_int(1),irvec_new_int(2),irvec_new_int(3))=1
-
+            nir1=irn2(1)-irn1(1)
+            nir2=irn2(2)-irn1(2)
+            nir3=irn2(3)-irn1(3)
+            if (abs(nir1)>max_ir .or. abs(nir2)>max_ir .or. abs(nir3)>max_ir) cycle
+            rpts_array(nir1,nir2,nir3)=1
          enddo
       enddo
    enddo
 
-   !> The total number of lattice points searched above
-   nrpts_surfacecell= sum(rpts_array)
-
-   allocate(irvec_surfacecell(3, nrpts_surfacecell))
-   irvec_surfacecell = 0
-
-   !> 2. Create an order map to sign the R points generated in step1
-
-   iter = 0
+   !> find all irvec
+   nrpts_new= sum(rpts_array)
+   allocate(irvec_newcell(3, Nrpts_new))
+   iter= 0
    do nir3=-max_ir,max_ir
       do nir2=-max_ir,max_ir
          do nir1=-max_ir,max_ir
             if (rpts_array(nir1, nir2, nir3)==1) then
                iter=iter+1
-               irvec_surfacecell(:, iter)=[nir1, nir2, nir3]
+               irvec_newcell(:, iter)=[nir1, nir2, nir3]
                rpts_map(nir1, nir2, nir3)=iter
             endif
          enddo
       enddo
    enddo
 
+   !>> hamiltonian for the new cell
+   allocate(HmnR_newcell(Num_wann, Num_wann, Nrpts_new))
+   allocate(ndegen_newcell(Nrpts_new))
+   HmnR_newcell= 0d0
+   ndegen_newcell= 1
 
-   allocate(HmnR_surfacecell(Num_wann, Num_wann, nrpts_surfacecell))
-   allocate(ndegen_surfacecell(nrpts_surfacecell))
-   HmnR_surfacecell= 0d0
-   ndegen_surfacecell= 1
-
-   if (.not. Orthogonal_Basis) then
-      allocate(SmnR_surfacecell(Num_wann, Num_wann, nrpts_surfacecell))
-      SmnR_surfacecell = 0d0
-   endif
-
-   !> 3. Allocate the old HmnR to the new HmnR.
-   !>  Note: The cell can't be treated as a mass point. We need to consider the relative coordinates of atoms.
+   !> get number of R points for the new cell first 
    do ir=1, nrpts
       do j=1, Num_wann
          do i=1, Num_wann
+           !ia1=Origin_cell%spinorbital_to_atom_index(i)
+           !ia2=Origin_cell%spinorbital_to_atom_index(j)
+           !apos1d= Origin_cell%Atom_position_direct(:, ia1)- shift_vec_direct
+           !apos2d= Origin_cell%Atom_position_direct(:, ia2)- shift_vec_direct+irvec(:, ir)
+            apos1d= Origin_cell%wannier_centers_direct(:, i)- shift_vec_direct
+            apos2d= Origin_cell%wannier_centers_direct(:, j)- shift_vec_direct+irvec(:, ir)
+            call latticetransform(apos1d(1),apos1d(2),apos1d(3),new_ia,new_ib,new_ic)
+            irn1=floor([new_ia,new_ib,new_ic])
 
-            ia1 = Origin_cell%spinorbital_to_atom_index(i)
-            ia2 = Origin_cell%spinorbital_to_atom_index(j)
-            apos1d = Origin_cell%Atom_position_direct(:, ia1)
-            apos2d = Origin_cell%Atom_position_direct(:, ia2) 
+            call latticetransform(apos2d(1),apos2d(2),apos2d(3),new_ia,new_ib,new_ic)
+            irn2=floor([new_ia,new_ib,new_ic])
 
-            ia1prime = Cell_defined_by_surface%spinorbital_to_atom_index(i)
-            ia2prime = Cell_defined_by_surface%spinorbital_to_atom_index(j)
-            apos1dprime = Cell_defined_by_surface%Atom_position_direct(:,ia1prime)
-            apos2dprime = Cell_defined_by_surface%Atom_position_direct(:,ia2prime)
-
-            !> R'_mn = R' + tau'_2 - tau'_1
-            !> R_mn = R + tau_2 - tau_1
-            !> R'_mn = Pinv * R_mn
-            !> R' = (Pinv * R_mn) - (tau'_2 - tau'_1)
-
-            Rmn_old = irvec(:, ir) + apos2d - apos1d
-            call latticetransform(Rmn_old(1),Rmn_old(2),Rmn_old(3),Rmn_new(1),Rmn_new(2),Rmn_new(3))
-            irvec_new = Rmn_new - (apos2dprime - apos1dprime)
-
-            !> For safety, we perform a rounding operation due to the accuracy of computing
-            irvec_new_int(1) = ANINT(irvec_new(1))
-            irvec_new_int(2) = ANINT(irvec_new(2))
-            irvec_new_int(3) = ANINT(irvec_new(3))
-
-            if (abs(irvec_new_int(1))>max_ir .or. abs(irvec_new_int(2))>max_ir .or. abs(irvec_new_int(3))>max_ir) cycle
-            ir_cell = rpts_map(irvec_new_int(1), irvec_new_int(2), irvec_new_int(3))
-            HmnR_surfacecell(i,j,ir_cell) = HmnR(i,j,ir)/ndegen(ir)
-            
-            if (.not. Orthogonal_Basis) then
-               SmnR_surfacecell(i,j,ir_cell) = SmnR(i,j,ir)/ndegen(ir)
-            endif 
-
+            nir1=irn2(1)-irn1(1)
+            nir2=irn2(2)-irn1(2)
+            nir3=irn2(3)-irn1(3)
+            if (abs(nir1)>max_ir .or. abs(nir2)>max_ir .or. abs(nir3)>max_ir) cycle
+            ir_cell= rpts_map(nir1, nir2, nir3)
+            HmnR_newcell(i,j,ir_cell)=HmnR(i,j,ir)/ndegen(ir)
          enddo
       enddo
    enddo
 
-   ! !> do cut-off according to the hopping value
-   ! iter= 0 
-   ! do ir=1, nrpts_new
-   !    max_val=maxval(abs(HmnR_newcell(:, :, ir)))/eV2Hartree
-   !    if (max_val<eps4) then
-   !       iter= iter+ 1
-   !    endif
-   ! enddo
+   !> do cut-off according to the hopping value
+   iter= 0 
+   do ir=1, nrpts_new
+      max_val=maxval(abs(HmnR_newcell(:, :, ir)))/eV2Hartree
+      if (max_val<eps4) then
+         iter= iter+ 1
+      endif
+   enddo
 
    if (cpuid==0.and.export_newhr) then
-      !> Problem: Just cut the nrpts_surfacecell, but the irvec is not well ordered. The order (iter) can be anywhere.
       !> write to new_hr.dat
-      ! nrpts_surfacecell=sum(rpts_array)-iter
-
-      nrpts_surfacecell=sum(rpts_array)
+      nrpts_new=sum(rpts_array)-iter
       outfileindex= outfileindex+ 1
       open(unit=outfileindex, file='wannier90_hr_newcell.dat')
       write(outfileindex, '(a,1X,a,1X,a,1X, a, a)')  &
          'HmnR for new cell generated at ', time_now, date_now, 'UTC', zone_now
       write(outfileindex, *)Num_wann
-      write(outfileindex, *)nrpts_surfacecell
-      write(outfileindex, '(15I5)')(1 , i=1, nrpts_surfacecell)
-      do ir=1, nrpts_surfacecell
-         max_val=maxval(abs(HmnR_surfacecell(:, :, ir)))/eV2Hartree
+      write(outfileindex, *)nrpts_new
+      write(outfileindex, '(15I5)')(1 , i=1, nrpts_new)
+      do ir=1, nrpts_new
+         max_val=maxval(abs(HmnR_newcell(:, :, ir)))/eV2Hartree
         !if (max_val<eps4) cycle
          do j=1, Num_wann
             do i=1, Num_wann
                write( outfileindex, '(5I5, 2f16.6)') &
-                  irvec_surfacecell(:, ir), i, j, HmnR_surfacecell(i, j, ir)/eV2Hartree
+                  irvec_newcell(:, ir), i, j, HmnR_newcell(i, j, ir)/eV2Hartree
             end do
          end do
       end do
@@ -809,6 +497,13 @@ subroutine readSparseHmnR
    nwann_nsoc=nwann
    if (SOC>0) nwann_nsoc= nwann/2
 
+   !> number of lattice vectors taken into account
+   read(12, *)nrpts
+
+   !> The degeneracy of each R point
+   read(12, *)(ndegen(i), i=1, nrpts)
+   ir=0
+
    !> whether we need to add the electric field potential
    add_electric_field=0
    call get_stacking_direction_and_pos(add_electric_field, pos)
@@ -837,42 +532,53 @@ subroutine readSparseHmnR
             splen= splen_input+ 4*nwann_nsoc
          endif
       else
-         !> no electrical field and Zeeman field
          splen= splen_input
       endif
    end if
 
    !> in order to include the Fermi level
-   !> for non-orthogonal_Basis, we can't include the fermi level in to H'
-   if (.not.Orthogonal_Basis) then
-      splen=splen
-   else
-      splen=splen+nwann
-   endif
+   splen=splen+nwann
 
-   allocate(hacoo(splen),hicoo(splen),hjcoo(splen),hirv(3, splen))
+   allocate(hacoo(splen),hicoo(splen),hjcoo(splen),hirv(splen))
    hacoo=(0d0, 0d0)
    hicoo=0
    hjcoo=0
    hirv=0
 
+   j=0
+   ir0=0
+   ir=1
+   irvec=-9999
+   read(12,*,end=1001)i1, i2, i3, i4, i5, r1, r2
+   irvec(1,ir)=i1
+   irvec(2,ir)=i2
+   irvec(3,ir)=i3
    !> will reread the above line
-   do j=1, splen_input
-      read(12,*,end=1001)i1, i2, i3, i4, i5, r1, r2
-      hirv (1, j)=i1
-      hirv (2, j)=i2
-      hirv (3, j)=i3
-      hicoo(j)=i4
-      hjcoo(j)=i5
-
-      if (trim(adjustl(Package))=="OPENMX") then
-         hacoo(j)=dcmplx(r1,r2)
-      else
-         hacoo(j)=dcmplx(r1,r2)*eV2Hartree
-      endif
+   backspace(12)
+   do q=1,nrpts
+      do n=1,nwann
+         do m=1,nwann
+            read(12,*,end=1001)i1, i2, i3, i4, i5, r1, r2
+            if (sum(abs(irvec(:,ir)-[i1,i2,i3]))/=0) ir=ir+1
+            j=j+1
+            hicoo(j)=i4
+            hjcoo(j)=i5
+            hirv (j)=ir
+            hacoo(j)=dcmplx(r1,r2)*eV2Hartree
+            if (i1==0.and.i2==0.and.i3==0.and.i4==i5) then
+               ir0= ir
+            endif
+            irvec(1,ir)=i1
+            irvec(2,ir)=i2
+            irvec(3,ir)=i3
+         end do
+      enddo
    enddo
-   j=j-1
-   1001 continue
+1001 continue
+   !> correct nrpts
+   Nrpts=ir
+
+   if (cpuid.eq.0) write(stdout, '(a, i6)')' >> NRPTS is ', Nrpts
 
    !> Adding zeeman field
    !> Bx=Bdirection(1)
@@ -895,9 +601,7 @@ subroutine readSparseHmnR
             j= i+ splen_input
             hicoo(j)=hicoo(i)+nwann_nsoc
             hjcoo(j)=hjcoo(i)+nwann_nsoc
-            hirv (1, j)=hirv (1, i)
-            hirv (2, j)=hirv (2, i)
-            hirv (3, j)=hirv (3, i)
+            hirv (j)=hirv (i)
             hacoo(j)=hacoo(i)
          enddo
       endif
@@ -938,17 +642,13 @@ subroutine readSparseHmnR
                j=j+1
                hicoo(j)= io
                hjcoo(j)= io
-               hirv (1, j)= 0
-               hirv (2, j)= 0
-               hirv (3, j)= 0
+               hirv (j)= ir0
                hacoo(j)= static_potential
                !> spin down
                j=j+1
                hicoo(j)= io + nwann_nsoc
                hjcoo(j)= io + nwann_nsoc
-               hirv (1, j)= 0
-               hirv (2, j)= 0
-               hirv (3, j)= 0
+               hirv (j)= ir0
                hacoo(j)= static_potential
             enddo ! nproj
          enddo ! ia
@@ -970,17 +670,13 @@ subroutine readSparseHmnR
                j=j+1
                hicoo(j)= io
                hjcoo(j)= io
-               hirv (1, j)= 0
-               hirv (2, j)= 0
-               hirv (3, j)= 0
+               hirv (j)= ir0
                hacoo(j)= static_potential
                if (SOC>0) then  ! with SOC
                   j=j+1
                   hicoo(j)= io + nwann_nsoc
                   hjcoo(j)= io + nwann_nsoc
-                  hirv (1, j)= 0
-                  hirv (2, j)= 0
-                  hirv (3, j)= 0
+                  hirv (j)= ir0
                   hacoo(j)= static_potential
                endif
             enddo ! nproj
@@ -988,120 +684,42 @@ subroutine readSparseHmnR
       endif ! Add_Zeeman_Field or not
    endif ! add_electric_field
 
-   !> the Fermi level can be added to the Hamiltonian directly only with in the orthogonal basis
-   if (Orthogonal_Basis) then
-      !> add Fermi level
-      do n=1,num_wann
-         j=j+1
-         hicoo(j)=n
-         hjcoo(j)=n
-         hirv (1, j)= 0
-         hirv (2, j)= 0
-         hirv (3, j)= 0
-         hacoo(j)= - E_FERMI*eV2Hartree
-      enddo
-   endif
+   !> add Fermi level
+   do n=1,num_wann
+      j=j+1
+      hicoo(j)=n
+      hjcoo(j)=n
+      hirv (j)=ir0
+      hacoo(j)= - E_FERMI*eV2Hartree
+   enddo
 
    !> transform it into dense format only when number of wannier orbitals is less than 100
 
    outfileindex= outfileindex+ 1
    if (cpuid.eq.0.and. nwann<500) then
-!     open (unit=outfileindex, file='hr.dat-dense')
-!     write(outfileindex, *) ' ! HmnR file from sparse hr file'
-!     write(outfileindex, '(I10, a)') nwann, '  ! Num_wann: number of wannier orbitals'
-!     write(outfileindex, '(I10, a)') Nrpts, '  ! NRPTS: number of R points'
-!     write(outfileindex, '(10I5)') ndegen(:)
-!     do iR=1, NRPTS
-!        i1= irvec(1, iR)
-!        i2= irvec(2, iR)
-!        i3= irvec(3, iR)
-!        do n=1, nwann
-!           do m=1, nwann
-!              h_value=0d0
-!              do i=1, splen
-!                 if (hicoo(i)==n.and.hjcoo(i)==m.and.hirv(1, i)==i1.and.hirv(2, i)==i2.and.hirv(3, i)==i3)then
-!                    h_value= h_value+ hacoo(i)
-!                 endif
-!              enddo !i
-!              write(outfileindex, '(5I5, 2f12.6)')irvec(:, iR), n, m, h_value/eV2Hartree
-!           enddo !m
-!        enddo !n
-!     enddo !iR
-!     close(outfileindex)
+      open (unit=outfileindex, file='hr.dat-dense')
+      write(outfileindex, *) ' ! HmnR file from sparse hr file'
+      write(outfileindex, '(I10, a)') nwann, '  ! Num_wann: number of wannier orbitals'
+      write(outfileindex, '(I10, a)') Nrpts, '  ! NRPTS: number of R points'
+      write(outfileindex, '(10I5)') ndegen(:)
+      do iR=1, NRPTS
+         do n=1, nwann
+            do m=1, nwann
+               h_value=0d0
+               do i=1, splen
+                  if (hicoo(i)==n.and.hjcoo(i)==m.and.hirv(i)==iR)then
+                     h_value= h_value+ hacoo(i)
+                  endif
+               enddo !i
+               write(outfileindex, '(5I5, 2f12.6)')irvec(:, iR), n, m, h_value/eV2Hartree
+            enddo !m
+         enddo !n
+      enddo !iR
+      close(outfileindex)
    endif
 
    return
 end subroutine readSparseHmnR
-
-subroutine readsparse_overlap
-   !> This subroutine reads the overlap matrix S between the non-orthogonal basis
-   !> 2023 Dec. 4th
-   !> by QSWU (wuquansheng@gmail.com)
-   use para
-   implicit none
-   integer:: i,j,nwann,nwann_nsoc,i1,i2,i3,i4,i5,ir,n,m 
-   real(dp) :: r1, r2
-   logical :: exists
-
-   if(cpuid.eq.0)write(stdout,*)' '
-   if(cpuid.eq.0)write(stdout,'(2a)')' >> Now we are reading the overlap files: ', trim(adjustl(Overlapfile))
-   inquire(file= Overlapfile, EXIST = exists)
-   if (exists)then
-      open(13, file= Overlapfile, status='OLD')
-   else
-      STOP ">> for non-orthogonal basis , you have to prepare a file like overlap.dat"
-   endif
-
-
-   !> skip a comment line
-   read(13, *)
-
-   !> comparing with the standard overlap file, we add another line to show howmany
-   !> lines that S is not zero.
-!  if (Is_Sparse_Hr) then
-   read(13,*) splen_overlap_input   !> number of non-zeros lines
-!  end if
-
-   !> number of Wannier orbitals in the hr file
-   nwann=0
-   read(13, *)nwann
-   if (nwann==0.or.nwann.ne.Num_wann) then
-      print *, 'in readsparse_overlap'
-      print *, 'nwann, num_wann', nwann, num_wann
-      stop "ERROR : num_wann is zero or num_wann is not consistent with hr.dat"
-   endif
-   nwann_nsoc=nwann
-   if (SOC>0) nwann_nsoc= nwann/2
-
-   !> overlap matrix in sparse format
-   allocate(sacoo(splen_overlap_input))
-   allocate(sicoo(splen_overlap_input))
-   allocate(sjcoo(splen_overlap_input))
-   allocate(sirv(3, splen_overlap_input))
-   sacoo=(0d0, 0d0)
-   sicoo=0
-   sjcoo=0
-   sirv=0
-
-   !> will reread the above line
-   do i=1, splen_overlap_input
-      read(13,*,end=1003)i1, i2, i3, i4, i5, r1, r2
-      sirv(1, i)= i1
-      sirv(2, i)= i2
-      sirv(3, i)= i3
-      sicoo(i)=i4
-      sjcoo(i)=i5
-      sacoo(i)=dcmplx(r1,r2)
-   enddo
-   1003 continue
-   close(13)
-
-   if (cpuid.eq.0) write(stdout, '(a, i20)')' >> Number of non-zeros splen_overlap_input', splen_overlap_input
-   if (cpuid.eq.0) write(stdout, '(a)')' >> Sparse overlap matrix reading finished '
-
-   return
-end subroutine readsparse_overlap
-
 
 
 subroutine readsparse_valley_operator
@@ -1194,7 +812,7 @@ subroutine readsparse_valley_operator
    Nrpts_valley=ir
 
    if (cpuid.eq.0) write(stdout, '(a, i6)')' >> Nrpts_valley is ', Nrpts_valley
-   if (cpuid.eq.0) write(stdout, '(a, 2i10)')' >> splen_valley_input', splen_valley_input, j
+   if (cpuid.eq.0) write(stdout, '(a)')' >> splen_valley_input', splen_valley_input, j
    if (cpuid.eq.0) write(stdout, '(a)')' >> Valley operator reading finished '
 
    return
@@ -1241,28 +859,9 @@ subroutine get_stacking_direction_and_pos(add_electric_field, pos)
 
    integer, intent(inout) :: add_electric_field
    real(dp), intent(out) :: pos(Origin_cell%Num_atoms)
-   real(dp), allocatable :: pos_selected_for_center(:, :)
 
-   integer :: i, ia, NumberofSelectedAtoms_center, iter, ia_g, ig
+   integer :: i, ia
    real(dp) :: dxmax(3), center
-
-   !> sum over all selected atoms
-   NumberofSelectedAtoms_center= sum(NumberofSelectedAtoms(:))
-   allocate(pos_selected_for_center(3, NumberofSelectedAtoms_center))
-   pos_selected_for_center= 0d0
-
-   iter= 0
-   do ig=1,  NumberofSelectedAtoms_groups
-      do ia_g= 1, NumberofSelectedAtoms(ig)
-         iter=iter+1
-         ia= Selected_Atoms(ig)%iarray(ia_g)
-         pos_selected_for_center(:, iter)= Origin_cell%Atom_position_direct(:, ia)
-      enddo
-   enddo
-   if (cpuid.eq.0)then
-      write(stdout, '(a, 3f12.6)') ">>: Center position for zero electrical potential for adding electrical field", &
-         sum(pos_selected_for_center(:, :), dim=2)/NumberofSelectedAtoms_center
-   endif
 
    !> Adding electric field
    !> The electric field is only applied on the 2D system.
@@ -1297,14 +896,12 @@ subroutine get_stacking_direction_and_pos(add_electric_field, pos)
    if (add_electric_field>0) then
       pos=Origin_cell%Atom_position_direct(add_electric_field, :)
       pos= mod(pos, 1d0)-0.5d0
-      pos_selected_for_center= mod(pos_selected_for_center, 1d0)-0.5d0
       if (sum(center_atom_for_electric_field)>0) then
          center= (Origin_cell%Atom_position_direct(add_electric_field, center_atom_for_electric_field(1)) &
                 + Origin_cell%Atom_position_direct(add_electric_field, center_atom_for_electric_field(2)))/2d0
          center= mod(center, 1d0)-0.5d0
       else
-        !center= (maxval(pos)+minval(pos))/2d0
-         center= sum(pos_selected_for_center(add_electric_field, :))/NumberofSelectedAtoms_center
+         center= (maxval(pos)+minval(pos))/2d0
       endif
       pos=pos-center
    endif  ! add electric field or not
@@ -1351,36 +948,28 @@ subroutine add_zeeman_sparse_hr(Bx_in_au, By_in_au, Bz_in_au)
       j= j+ 1
       hicoo(j)= i
       hjcoo(j)= i
-      hirv (1, j)= 0
-      hirv (2, j)= 0
-      hirv (3, j)= 0
+      hirv (j)= ir0
       hacoo(j)= Zeeman_energy_in_hartree_factor/2d0*Bz_in_au
    enddo
    do i=1, nwann_nsoc
       j= j+ 1
       hicoo(j)= i+ nwann_nsoc
       hjcoo(j)= i+ nwann_nsoc
-      hirv (1, j)= 0
-      hirv (2, j)= 0
-      hirv (3, j)= 0
+      hirv (j)= ir0
       hacoo(j)= -Zeeman_energy_in_hartree_factor/2d0*Bz_in_au
    enddo
    do i=1, nwann_nsoc
       j= j+ 1
       hicoo(j)= i
       hjcoo(j)= i+ nwann_nsoc
-      hirv (1, j)= 0
-      hirv (2, j)= 0
-      hirv (3, j)= 0
+      hirv (j)= ir0
       hacoo(j)=  Zeeman_energy_in_hartree_factor/2d0*(By_in_au*zi+ Bx_in_au)
    enddo
    do i=1, nwann_nsoc
       j= j+ 1
       hicoo(j)= i+ nwann_nsoc
       hjcoo(j)= i
-      hirv (1, j)= 0
-      hirv (2, j)= 0
-      hirv (3, j)= 0
+      hirv (j)= ir0
       hacoo(j)=  Zeeman_energy_in_hartree_factor/2d0*(-By_in_au*zi+ Bx_in_au)
    enddo
    if (j>splen) stop "ERROR happend in setting zeeman energy in readhmnr.f90"
@@ -1425,78 +1014,133 @@ subroutine reorder_wannierbasis
 end subroutine reorder_wannierbasis
 
 
-
-
-
- subroutine add_zeeman_normal_hr()
-   !> add Zeeman energy on the sparse hmnr based on Zeeman_energy_in_eV and the magnetic field direction
-   !> Bx=Bdirection(1)
-   !> By=Bdirection(2)
-   !> Bz=Bdirection(3)
-   !> magnetic_field_in_tesla is in Tesla
-   !> Here the coordinate system is the same as user-specified in the LATTICE card.
-   !> H_zeeman
+subroutine reorder_wanniercenters
+   !> Reorder the wannier centers that were read from the WANNIER_CENTRES
+   !> card from "up dn up dn" to "up up dn dn".
+   !>
+   !> For packages such as VASP6 / new wannier90 / QE, the hr file uses the
+   !> spin ordering "up dn up dn" and readHmnR reorders HmnR to WannierTools'
+   !> internal "up up dn dn" ordering via reorder_wannierbasis. The wannier
+   !> centers supplied through the WANNIER_CENTRES card are given in the
+   !> original (hr-file) order, so they must be permuted with the SAME mapping
+   !> to stay consistent with the reordered HmnR; otherwise the position
+   !> operator (e.g. dHdk_atomicgauge) assigns wrong positions to orbitals.
+   !>
+   !> NOTE: only call this for centers provided through the WANNIER_CENTRES
+   !> card. The default centers are already built in "up up dn dn" order.
    use para
    implicit none
 
-   real(dp) :: Bdirection_x, Bdirection_y, Bdirection_z
+   integer :: i, nwann, nso
+   integer, allocatable :: orderi(:)
+   real(dp), allocatable :: wcc_temp(:, :), wcd_temp(:, :)
 
-   integer :: nwann_nsoc, n, m, ir0, ir
-   real(dp) :: Zeeman_energy_in_au
+   if (SOC==0) return
 
-   if (.not.Add_Zeeman_Field) return
+   !> same package condition that triggers reorder_wannierbasis in readHmnR
+   if ( .not.( index(Package, 'QE')/=0 .or. index(Package, 'quantumespresso')/=0 &
+      .or. index(Package, 'quantum-espresso')/=0 .or. index(Package, 'VASP6')/=0 &
+      .or. index(Package, 'pwscf')/=0 ) ) return
 
-   nwann_nsoc= Num_wann/2
+   nso= Origin_cell%NumberOfspinorbitals
+   nwann= nso/2
 
-   ir0=0
-   do ir=1, Nrpts
-      if (irvec(1,ir)==0.and.irvec(2,ir)==0.and.irvec(3,ir)==0) then
-         ir0= ir
-      endif
+   allocate(orderi(nso))
+   allocate(wcc_temp(3, nso), wcd_temp(3, nso))
+   orderi= 1
+
+   do i=1, nwann
+      orderi(i)= 2*i-1
+      orderi(i+nwann)= 2*i
    enddo
-   if (ir0==0) stop 'something wrong with irvec in subroutine add_zeeman_normal_hr'
 
-   if (abs(Zeeman_energy_in_eV)<eps9)then
-      !> in atomic unit
-      Zeeman_energy_in_au= Effective_gfactor*Bohr_magneton*Bmagnitude
-   else
-      Zeeman_energy_in_au= Zeeman_energy_in_eV*eV2Hartree
-   endif
-   if (cpuid==0)then
-      write(stdout, '(1x, a, 1f16.6, a)')" >>> Zeeman_energy_in_au used in WT: ",  Zeeman_energy_in_au, ' Hartree'
-      write(stdout, '(1x, a, 1f16.6, a)')" >>> Zeeman_energy_in_eV used in WT: ",  Zeeman_energy_in_au/eV2Hartree, ' eV'
-      write(stdout, '(1x, a, 3f16.3, a)')" >>> Bdirection: ",  Bdirection 
-   endif
+   do i=1, nso
+      wcc_temp(:, i)= Origin_cell%wannier_centers_cart(:, orderi(i))
+      wcd_temp(:, i)= Origin_cell%wannier_centers_direct(:, orderi(i))
+   enddo
+   Origin_cell%wannier_centers_cart  = wcc_temp
+   Origin_cell%wannier_centers_direct= wcd_temp
 
-   if (SOC==0) then
-      !> We need to extend the spin up to the spin down part
-      do n=1, nwann_nsoc
-         HmnR(n, n, ir0)            = HmnR(n, n, ir0)+ Zeeman_energy_in_au/2d0*Bdirection(3)
-         HmnR(n+nwann_nsoc, n+nwann_nsoc, ir0)= HmnR(n, n, ir0)- Zeeman_energy_in_au/2d0*Bdirection(3)
-         HmnR(n      , n+nwann_nsoc, ir0)= Zeeman_energy_in_au/2d0*Bdirection(1) &
-                                         - zi*Zeeman_energy_in_au/2d0*Bdirection(2)
-         HmnR(n+nwann_nsoc, n      , ir0)= Zeeman_energy_in_au/2d0*Bdirection(1) &
-                                         + zi*Zeeman_energy_in_au/2d0*Bdirection(2)
-      enddo
- 
-      do ir=1, Nrpts
-         do m=1, nwann_nsoc
-            do n=1, nwann_nsoc
-               HmnR(n+nwann_nsoc, m+nwann_nsoc, ir)= HmnR(n, m, ir)
-            enddo ! m
-         enddo ! n
-      enddo ! ir
-   else
-      do n=1, nwann_nsoc
-         HmnR(n, n, ir0)            = HmnR(n, n, ir0)+ Zeeman_energy_in_au/2d0*Bdirection(3)
-         HmnR(n+nwann_nsoc, n+nwann_nsoc, ir0)= HmnR(n+nwann_nsoc, n+nwann_nsoc, ir0)- Zeeman_energy_in_au/2d0*Bdirection(3)
-         HmnR(n      , n+nwann_nsoc, ir0)= HmnR(n      , n+nwann_nsoc, ir0)+ Zeeman_energy_in_au/2d0*Bdirection(1) &
-                                         - zi*Zeeman_energy_in_au/2d0*Bdirection(2)
-         HmnR(n+nwann_nsoc, n      , ir0)= HmnR(n+nwann_nsoc, n      , ir0)+ Zeeman_energy_in_au/2d0*Bdirection(1) &
-                                         + zi*Zeeman_energy_in_au/2d0*Bdirection(2)
-      enddo
-   endif ! SOC
+   deallocate(orderi, wcc_temp, wcd_temp)
+
+   if (cpuid==0) then
+      write(stdout, *)' '
+      write(stdout, *)'>> WANNIER_CENTRES reordered from "up dn up dn" to "up up dn dn"'
+      write(stdout, *)'   to match the reordered HmnR (Package= ', trim(adjustl(Package)), ')'
+   endif
 
    return
+end subroutine reorder_wanniercenters
 
- end subroutine add_zeeman_normal_hr
+
+
+
+
+!subroutine add_zeeman_normal_hr(Bx_in_Tesla, By_in_Tesla, Bz_in_Tesla)
+!  !> add Zeeman energy on the sparse hmnr based on the magnetic field strength
+!  !> magnetic_field_in_tesla is in Tesla
+!  !> Here the coordinate system is the same as user-specified in the LATTICE card.
+!  use para
+!  implicit none
+
+!  real(dp), intent(in) :: Bx_in_Tesla, By_in_Tesla, Bz_in_Tesla
+
+!  integer :: nwann_nsoc, i, j, ir0, ir
+!  real(dp) :: Zeeman_energy_in_eV_factor
+
+!  nwann_nsoc= Num_wann/2
+
+!  if (.not.Add_Zeeman_Field) return
+
+!  ir0=0
+!  do ir=1, Nrpts
+!     if (irvec(1,ir)==0.and.irvec(2,ir)==0.and.irvec(3,ir)==0) then
+!        ir0= ir
+!     endif
+!  enddo
+!  if (ir0==0) stop 'something wrong with irvec in subroutine add_zeeman_sparse_hr'
+
+!  Zeeman_energy_in_eV_factor= Effective_gfactor*Bohr_magneton
+
+!  if (SOC==0) then
+!     do ir=1, Nrpts
+!        do n=1, nwann_nsoc
+!           do m=1, nwann_nsoc
+!              if (irvec(1, ir)==0.and.irvec(2, ir)==0.and.irvec(3, ir)==0.and.n==m) then
+!                 HmnR(n+nwann_nsoc, m+nwann_nsoc, ir)= HmnR(n, m, ir)- Zeeman_energy_in_eV_factor/2d0*Bz_in_Tesla
+!                 HmnR(n, m, ir)            = HmnR(n, m, ir)+ Zeeman_energy_in_eV_factor/2d0*Bz_in_Tesla
+!                 HmnR(n      , m+nwann_nsoc, ir)=                 Zeeman_energy_in_eV_factor/2d0*Bx_in_Tesla &
+!                                                           - zi*Zeeman_energy_in_eV_factor/2d0*By_in_Tesla
+!                 HmnR(n+nwann_nsoc, m      , ir)=                 Zeeman_energy_in_eV_factor/2d0*Bx_in_Tesla &
+!                                                           + zi*Zeeman_energy_in_eV_factor/2d0*By_in_Tesla
+!              else
+!                 HmnR(n+nwann_nsoc, m+nwann_nsoc, ir)= HmnR(n, m, ir)
+!              endif ! R=0
+!           enddo ! m
+!        enddo ! n
+!     enddo ! ir
+!  else
+!     do ir=1, Nrpts
+!        if (irvec(1, ir)/=0.or.irvec(2, ir)/=0.or.irvec(3, ir)/=0) cycle
+!        do n=1, nwann_nsoc
+!           do m=1, nwann_nsoc
+!              if (n==m) then
+!                 HmnR(n+nwann_nsoc, m+nwann_nsoc, ir)= HmnR(n+nwann_nsoc, &
+!                 m+nwann_nsoc, ir)-Zeeman_energy_in_eV_factor/2d0*Bz_in_Tesla
+!                 HmnR(n      , m+nwann_nsoc, ir)= HmnR(n, m+nwann_nsoc, ir)+ &
+!                   Zeeman_energy_in_eV_factor/2d0*Bx_in_Tesla &
+!                                                           -zi*Zeeman_energy_in_eV_factor/2d0*By_in_Tesla
+!                 HmnR(n+nwann_nsoc, m      , ir)= HmnR(n+nwann_nsoc, m, ir)+  &
+!                  Zeeman_energy_in_eV_factor/2d0*Bx_in_Tesla &
+!                                                           +zi*Zeeman_energy_in_eV_factor/2d0*By_in_Tesla
+!                 HmnR(n, m, ir)= HmnR(n, m, ir)+Zeeman_energy_in_eV_factor/2d0*Bz_in_Tesla
+!              endif ! R=0
+!           enddo ! m
+!        enddo ! n
+!     enddo ! ir
+!  endif ! SOC
+
+
+!  return
+
+!end subroutine add_zeeman_normal_hr

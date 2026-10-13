@@ -83,10 +83,9 @@ subroutine lanczos_seqsparse_cpu_z(NumLczVectors, NumLczVectors_out, Mdim, nnz, 
    vec_0= 1d0/betan(1)* vec_0
 
    !* perform |vec(1,:)>=Ham |vec(0,:)>
-!#if defined (INTELMKL)
-!   call mkl_zcsrgemv('N', Mdim, acsr, icsr, jcsr, vec_0, vec_1)
-!#endif
-   call csrmv_z(Mdim, nnz, acsr, icsr, jcsr, vec_0, vec_1)
+#if defined (INTELMKL)
+   call mkl_zcsrgemv('N', Mdim, acsr, icsr, jcsr, vec_0, vec_1)
+#endif
 
    !* a_0= <phi_0|H|phi_0>
    alpha(1) = zdotc(Mdim, vec_0, 1, vec_1, 1)
@@ -115,10 +114,9 @@ subroutine lanczos_seqsparse_cpu_z(NumLczVectors, NumLczVectors_out, Mdim, nnz, 
       call now(time_start)
 
 
-!#if defined (INTELMKL)
-!      call mkl_zcsrgemv('N', Mdim, acsr, icsr, jcsr, vec_1, vec_2)
-!#endif
-      call csrmv_z(Mdim, nnz, acsr, icsr, jcsr, vec_1, vec_2)
+#if defined (INTELMKL)
+      call mkl_zcsrgemv('N', Mdim, acsr, icsr, jcsr, vec_1, vec_2)
+#endif
 
       !* calculate alpha, betan
       t_z1= zdotc(Mdim, vec_1, 1, vec_2, 1)
@@ -329,8 +327,8 @@ subroutine LandauLevel_B_dos_Lanczos
    use sparse
    use wmpi
    use mt19937_64
-   use para, only : Magq, Num_Wann, Bx, By, zi, pi, Fermi_broadening, iso_energy, &
-      OmegaNum, OmegaMin, OmegaMax,  Magp, stdout, Magp_min, Magp_max, nnzmax_input, &
+   use para, only : Magq, Num_Wann, Bx, By, zi, pi, eta_arc, E_arc, &
+      OmegaNum, OmegaMin, OmegaMax,  Magp, stdout, Magp_min, Magp_max, &
       outfileindex, Single_KPOINT_3D_DIRECT,splen,Is_Sparse_Hr, eV2Hartree, &
       MagneticSuperProjectedArea,ijmax,NumLCZVecs, NumRandomConfs, Add_Zeeman_Field
    implicit none
@@ -379,18 +377,14 @@ subroutine LandauLevel_B_dos_Lanczos
    allocate(eta_array(NumberofEta))
    allocate(n_Earc(NumberofEta))
    eta_array=(/0.1d0, 0.2d0, 0.4d0, 0.8d0, 1.0d0, 2d0, 4d0, 8d0, 10d0/)
-   eta_array= eta_array*Fermi_broadening
+   eta_array= eta_array*Eta_Arc
 
 
    Nq= Magq
    Nmag= Magp_max- Magp_min +1
    Mdim= Num_Wann*Nq
-   if (nnzmax_input<0)then
-      nnzmax= Num_wann*(2*ijmax+1+2)*Mdim
-      if(Is_Sparse_Hr) nnzmax=splen*Nq
-   else
-      nnzmax= nnzmax_input
-   endif
+   nnzmax= Num_wann*(2*ijmax+1+2)*Mdim
+   if(Is_Sparse_Hr) nnzmax=splen*Nq
    if (cpuid==0) then
       write(stdout, '(a,i8)')' Magnetic supercell is Nq= ', Nq
       write(stdout, '(a,i18)')' Hamiltonian matrix dimension Mdim= ', Mdim
@@ -585,7 +579,7 @@ subroutine LandauLevel_B_dos_Lanczos
 
       !> find n_int at EF
       do ie=1, omeganum
-         if (omega(ie)>iso_energy) then
+         if (omega(ie)>E_arc) then
             ie_Earc= ie- 1
             exit
          endif
@@ -597,7 +591,7 @@ subroutine LandauLevel_B_dos_Lanczos
             write(outfileindex, '(300f16.6)')flux(ib)/2d0/pi, mag_Tesla(ib), omega(ie)/eV2Hartree, dos_B_omega_mpi(ib, ie, :)
          enddo
 
-         !> get number of electrons between the lowest energy level and iso_energy
+         !> get number of electrons between the lowest energy level and E_arc
          n_Earc= 0d0
          do ie=1, ie_Earc
             n_Earc(:)= n_Earc(:)+ dos_B_omega_mpi(ib, ie, :)
@@ -703,10 +697,10 @@ subroutine LandauLevel_k_dos_Lanczos
    use prec
    use sparse
    use wmpi
-   use para, only : Magq, Num_Wann, Bx, By, zi, pi, Fermi_broadening, Angstrom2atomic, &
-      OmegaNum, OmegaMin, OmegaMax, nk3_band, Magp, stdout, kpath_3d, eV2Hartree, &
+   use para, only : Magq, Num_Wann, Bx, By, zi, pi, eta_arc, Angstrom2atomic, &
+      OmegaNum, OmegaMin, OmegaMax, nk3_band, Magp, stdout, k3points, eV2Hartree, &
       outfileindex, K3len_mag,splen,Is_Sparse_Hr,ijmax,NumLCZVecs, MagneticSuperProjectedArea, &
-      Nk3lines, k3line_mag_stop, k3line_name, NumRandomConfs, nnzmax_input
+      Nk3lines, k3line_mag_stop, k3line_name, NumRandomConfs
    implicit none
 
    !> magnetic field strength, this number should compatiable with the magnetic supercell
@@ -740,15 +734,12 @@ subroutine LandauLevel_k_dos_Lanczos
 
    Nq= Magq
    Mdim= Num_Wann*Magq
+   nnzmax= Num_wann*(2*ijmax+1)*Mdim
+   if(Is_Sparse_Hr) nnzmax=splen*Nq
+
    !> need to be checked
    !if(Is_Sparse_Hr) nnzmax=Nq*splen
-   if (nnzmax_input<0)then
-      nnzmax= Num_wann*(2*ijmax+1+2)*Mdim
-      if(Is_Sparse_Hr) nnzmax=splen*Nq
-   else
-      nnzmax= nnzmax_input
-   endif
- 
+
    NumLczVectors = NumLCZVecs
    NumLczVectors_out = NumLCZVecs
    if (NumLczVectors>Mdim) then
@@ -830,7 +821,7 @@ subroutine LandauLevel_k_dos_Lanczos
          InitialVector= InitialVector/dsqrt(dble(norm))
 
          if (cpuid==0) write(stdout, '(a, 2i10)') 'LandauLevel_k_DOS', ik, nk3_band
-         k3= kpath_3d(:, ik)
+         k3= k3points(:, ik)
          nnz= nnzmax
          if(Is_Sparse_Hr) then
             call ham_3Dlandau_sparseHR(nnz,Mdim,NQ,k3,acsr,jcsr,icsr)
@@ -854,7 +845,7 @@ subroutine LandauLevel_k_dos_Lanczos
          do ie=1, OmegaNum
             energy= omega(ie)
             dos_k_omega(ik, ie)=dos_k_omega(ik, ie)+  &
-               continued_fraction(Alpha,Betan,energy,Fermi_broadening,NumLczVectors_out, term)
+               continued_fraction(Alpha,Betan,energy,eta_arc,NumLczVectors_out, term)
          enddo
          call now(time_end)
       enddo ! it= 1, NumRandomConfs
@@ -936,8 +927,8 @@ subroutine bulkbandk_dos_lanczos
    use prec
    use sparse
    use wmpi
-   use para, only : Magq, Num_Wann, Bx, By, zi, pi, Fermi_broadening, Angstrom2atomic, &
-      OmegaNum, OmegaMin, OmegaMax, nk3_band, Magp, stdout, kpath_3d, nnzmax_input, &
+   use para, only : Magq, Num_Wann, Bx, By, zi, pi, eta_arc, Angstrom2atomic, &
+      OmegaNum, OmegaMin, OmegaMax, nk3_band, Magp, stdout, k3points, &
       outfileindex, K3len,splen,Is_Sparse_Hr,ijmax,NumLCZVecs, eV2Hartree
    implicit none
 
@@ -971,13 +962,9 @@ subroutine bulkbandk_dos_lanczos
 
    Nq= 1
    Mdim= Num_Wann*Nq
-   if (nnzmax_input<0)then
-      nnzmax= Num_wann*(2*ijmax+1+2)*Mdim
-      if(Is_Sparse_Hr) nnzmax=splen*Nq
-   else
-      nnzmax= nnzmax_input
-   endif
- 
+   nnzmax= Num_wann*(2*ijmax+1)*Mdim
+   if(Is_Sparse_Hr) nnzmax=splen*Nq
+
    !> need to be checked
    !if(Is_Sparse_Hr) nnzmax=Nq*splen
 
@@ -1027,7 +1014,7 @@ subroutine bulkbandk_dos_lanczos
       InitialVector= InitialVector/dsqrt(dble(norm))
 
       if (cpuid==0) write(stdout, '(a, 2i10)') 'LandauLevel_k_DOS', ik, nk3_band
-      k3= kpath_3d(:, ik)
+      k3= k3points(:, ik)
       nnz= nnzmax
       if(Is_Sparse_Hr) then
          call ham_bulk_coo_sparsehr(k3, acsr,jcsr,icsr)
@@ -1050,7 +1037,7 @@ subroutine bulkbandk_dos_lanczos
       term = .False.
       do ie=1, OmegaNum
          energy= omega(ie)
-         dos_k_omega(ik, ie)=continued_fraction(Alpha,Betan,energy,Fermi_broadening,NumLczVectors_out, term)
+         dos_k_omega(ik, ie)=continued_fraction(Alpha,Betan,energy,eta_arc,NumLczVectors_out, term)
       enddo
    enddo
 
@@ -1115,8 +1102,8 @@ subroutine bulk_dos_lanczos
    use prec
    use sparse
    use wmpi
-   use para, only : Num_Wann, Bx, By, zi, pi, Fermi_broadening, &
-      OmegaNum, OmegaMin, OmegaMax, nk3_band, Magp, stdout, nnzmax_input, &
+   use para, only : Num_Wann, Bx, By, zi, pi, eta_arc, &
+      OmegaNum, OmegaMin, OmegaMax, nk3_band, Magp, stdout, &
       outfileindex,splen,Is_Sparse_Hr,ijmax,NumLCZVecs,Nk1,Nk2,Nk3,&
       K3D_start_cube,K3D_vec1_cube,K3D_vec2_cube,K3D_vec3_cube, &
       NumRandomConfs, Omega_array, eV2Hartree
@@ -1152,19 +1139,15 @@ subroutine bulk_dos_lanczos
 
    NumberofEta=9
    Mdim= Num_Wann
+   nnzmax= Num_wann*(2*ijmax+1)*Mdim
    knv3= Nk1*Nk2*Nk3
 
-   if (nnzmax_input<0)then
-      nnzmax= Num_wann*(2*ijmax+1+2)*Mdim
-      if (Is_Sparse_Hr) then
-         nnzmax=splen
-      else
-         nnzmax= Num_wann* Num_wann
-      endif
+   if (Is_Sparse_Hr) then
+      nnzmax=splen
    else
-      nnzmax= nnzmax_input
+      nnzmax= Num_wann* Num_wann
    endif
- 
+
    !> need to be checked
    !if(Is_Sparse_Hr) nnzmax=Nq*splen
 
@@ -1183,7 +1166,7 @@ subroutine bulk_dos_lanczos
    omega= Omega_array
 
    eta_array=(/0.1d0, 0.2d0, 0.4d0, 0.8d0, 1.0d0, 2d0, 4d0, 8d0, 10d0/)
-   eta_array= eta_array*Fermi_broadening
+   eta_array= eta_array*Eta_Arc
 
    allocate(InitialVector(Mdim))
    allocate(Alpha(NumLczVectors), Betan(NumLczVectors))
@@ -1327,7 +1310,7 @@ subroutine SeqLanczosDOS
    use prec
    use sparse
    use wmpi
-   use para, only : Magq, Num_Wann, Bx, By, zi, pi, Fermi_broadening, &
+   use para, only : Magq, Num_Wann, Bx, By, zi, pi, eta_arc, &
       eV2Hartree, OmegaNum, OmegaMin, OmegaMax, Omega_array
    implicit none
 
@@ -1418,7 +1401,7 @@ subroutine SeqLanczosDOS
    !> Betan(1) is meaningless.
    term = .True.
    do ie=1, OmegaNum
-      dos(ie)=continued_fraction(Alpha,Betan,omega(ie),Fermi_broadening,NumLczVectors_out, term)
+      dos(ie)=continued_fraction(Alpha,Betan,omega(ie),eta_arc,NumLczVectors_out, term)
       write(10001, '(100f16.6)') omega(ie), dos(ie)
    enddo
 
@@ -1497,7 +1480,7 @@ end function lastterm
 !> check whether the lanczos procedure is converged
 subroutine lanczos_converged(alphan,betan, NumLczVectors, current_lcz_vectors, dos_old, &
                           error, term, converged)
-  use para, only : dp, OmegaNum, Omega_array, Fermi_broadening, eps6
+  use para, only : dp, OmegaNum, Omega_array, eta_arc, eps6
   implicit none
 
   !>> Lanczos elements
@@ -1518,7 +1501,7 @@ subroutine lanczos_converged(alphan,betan, NumLczVectors, current_lcz_vectors, d
   area = 0d0
   do ie=1, OmegaNum
      e=Omega_array(ie)
-     tmp = continued_fraction(alphan, betan, e, Fermi_broadening, current_lcz_vectors, term)
+     tmp = continued_fraction(alphan, betan, e, eta_arc, current_lcz_vectors, term)
      diff = diff + abs(dos_old(ie)-tmp)
      area = area + abs(tmp)
      dos_old(ie) = tmp
