@@ -160,7 +160,7 @@ subroutine ek_bulk_line
    emin=  minval(eigv_mpi)-0.5d0
    emax=  maxval(eigv_mpi)+0.5d0
 
-   call generate_ek_kpath_gnu('bulkek.dat', 'bulkek.gnu', 'bulkek.pdf', &
+   call generate_ek_kpath_gnu('bulkek.dat', 'bulkek.gnu', 'bulkek.png', &
                                  emin, emax, knv3, Nk3lines, &
                                  k3line_name, k3line_stop, k3len)
 
@@ -368,7 +368,7 @@ subroutine ek_bulk_line_valley
    emin=  minval(eigv_mpi)-0.5d0
    emax=  maxval(eigv_mpi)+0.5d0
 
-   call generate_ek_kpath_gnu('bulkek.dat', 'bulkek.gnu', 'bulkek.pdf', &
+   call generate_ek_kpath_gnu('bulkek.dat', 'bulkek.gnu', 'bulkek.png', &
                                  emin, emax, knv3, Nk3lines, &
                                  k3line_name, k3line_stop, k3len)
 
@@ -1292,7 +1292,7 @@ subroutine sparse_ekbulk
       close(outfileindex)
    endif
 
-   call generate_ek_kpath_gnu('bulkek.dat', 'bulkek.gnu', 'bulkek.pdf', &
+   call generate_ek_kpath_gnu('bulkek.dat', 'bulkek.gnu', 'bulkek.png', &
                                  emin, emax, nk3_band, Nk3lines, &
                                  k3line_name, k3line_stop, k3len)
 
@@ -1595,7 +1595,7 @@ subroutine sparse_ekbulk_valley
    endif
 
 
-   call generate_ek_kpath_gnu('bulkek.dat', 'bulkek.gnu', 'bulkek.pdf', &
+   call generate_ek_kpath_gnu('bulkek.dat', 'bulkek.gnu', 'bulkek.png', &
                                  emin, emax, nk3_band, Nk3lines, &
                                  k3line_name, k3line_stop, k3len)
 
@@ -2722,7 +2722,7 @@ subroutine ek_bulk_mengyu
    emin=  minval(eigv_mpi)-0.5d0
    emax=  maxval(eigv_mpi)+0.5d0
 
-   call generate_ek_kpath_gnu('bulkek.dat', 'bulkek.gnu', 'bulkek.pdf', &
+   call generate_ek_kpath_gnu('bulkek.dat', 'bulkek.gnu', 'bulkek.png', &
                                  emin, emax, knv3, Nk3lines, &
                                  k3line_name, k3line_stop, k3len)
 
@@ -2866,7 +2866,7 @@ subroutine ek_bulk_spin
    emin= minval(eigv_mpi)-0.5d0
    emax= maxval(eigv_mpi)+0.5d0
 
-   call generate_ek_kpath_gnu('bulkek.dat', 'bulkek.gnu', 'bulkek.pdf', &
+   call generate_ek_kpath_gnu('bulkek.dat', 'bulkek.gnu', 'bulkek.png', &
                                  emin, emax, knv3, Nk3lines, &
                                  k3line_name, k3line_stop, k3len)
 
@@ -3027,7 +3027,7 @@ subroutine ek_bulk_mirror_z
    emin= minval(eigv_mpi)-0.5d0
    emax= maxval(eigv_mpi)+0.5d0
 
-   call generate_ek_kpath_gnu('bulkek.dat', 'bulkek.gnu', 'bulkek.pdf', &
+   call generate_ek_kpath_gnu('bulkek.dat', 'bulkek.gnu', 'bulkek.png', &
                                  emin, emax, knv3, Nk3lines, &
                                  k3line_name, k3line_stop, k3len)
 
@@ -3200,7 +3200,7 @@ subroutine ek_bulk_mirror_x
    emin= minval(eigv_mpi)-0.5d0
    emax= maxval(eigv_mpi)+0.5d0
 
-   call generate_ek_kpath_gnu('bulkek.dat', 'bulkek.gnu', 'bulkek.pdf', &
+   call generate_ek_kpath_gnu('bulkek.dat', 'bulkek.gnu', 'bulkek.png', &
                                  emin, emax, knv3, Nk3lines, &
                                  k3line_name, k3line_stop, k3len)
 
@@ -3293,7 +3293,7 @@ subroutine generate_ek_kpath_gnu(datafilename, gnufilename, gnuoutfilename, &
    outfileindex= outfileindex+ 1
    if (cpuid==0) then
       open(unit=outfileindex, file=gnufilename)
-      write(outfileindex, '(a)') 'set terminal pdf enhanced color font ",24"'
+      write(outfileindex, '(a)') 'set terminal pngcairo enhanced color font ",24"'
       write(outfileindex,'(2a)') 'set palette defined ( 0  "green", ', &
          '5 "yellow", 10 "red" )'
       write(outfileindex, '(3a)')"set output '", trim(adjustl(gnuoutfilename)), "' "

@@ -1270,8 +1270,8 @@ subroutine bulk_dos_lanczos
       open (unit=outfileindex, file='bulkdoslcz.gnu')
       write(outfileindex,*)     '#set terminal  postscript enhanced color font ",24"'
       write(outfileindex,*)     '#set terminal  pngcairo enhanced color font ",40"'
-      write(outfileindex,*)     'set terminal pdf enhanced color font ",20" size 4,4 '
-      write(outfileindex,*)     "set output 'Lanczos_dos.pdf'"
+      write(outfileindex,*)     'set terminal pngcairo enhanced color font ",20" size 4in,4in '
+      write(outfileindex,*)     "set output 'Lanczos_dos.png'"
       write(outfileindex,*)     'set style data linespoints'
       write(outfileindex,*)     '#unset ztics'
       write(outfileindex,*)     'set key box opaque samplen 0.5 textcolor variable font ",12"'

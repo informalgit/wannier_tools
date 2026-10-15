@@ -712,8 +712,8 @@
      if (cpuid==0) then
         open(unit=outfileindex, file='Berrycurvature_line.gnu')
         write(outfileindex, '(a)')"set encoding iso_8859_1"
-        write(outfileindex, '(a)') 'set terminal pdf enhanced color font ",16"'
-        write(outfileindex, '(a)')"set output 'Berrycurvature_line.pdf'"
+        write(outfileindex, '(a)') 'set terminal pngcairo enhanced color font ",16"'
+        write(outfileindex, '(a)')"set output 'Berrycurvature_line.png'"
         write(outfileindex, '(a)')'set style data linespoints'
         write(outfileindex, '(a)')'unset key'
         write(outfileindex, '(a)')'set pointsize 0.8'

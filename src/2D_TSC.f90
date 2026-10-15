@@ -515,8 +515,8 @@ subroutine ek_slab_BdG
    outfileindex= outfileindex+ 1
    if (cpuid==0) then
       open(unit=outfileindex, file='Delta_decay.gnu')
-      write(outfileindex, '(a)')'set terminal pdf enhanced color font ",24"'
-      write(outfileindex, '(a)')"set output 'Delta_decay.pdf'"
+      write(outfileindex, '(a)')'set terminal pngcairo enhanced color font ",24"'
+      write(outfileindex, '(a)')"set output 'Delta_decay.png'"
       write(outfileindex, '(a)')"set style data linespoints"
       write(outfileindex, '(a)')"unset key"
       write(outfileindex, '(a)')"set pointsize 0.8"
@@ -1084,8 +1084,8 @@ subroutine  wannier_center2D_BdG
    outfileindex= outfileindex+ 1
    if (cpuid==0) then
       open(unit=outfileindex, file='slabek_BdG_phase.gnu')
-      write(outfileindex, '(a)')'set terminal pdf enhanced color font ",24"'
-      write(outfileindex, '(a)')"set output 'slabek_BdG_phase.pdf'"
+      write(outfileindex, '(a)')'set terminal pngcairo enhanced color font ",24"'
+      write(outfileindex, '(a)')"set output 'slabek_BdG_phase.png'"
       write(outfileindex, '(a)')"set style data linespoints"
       write(outfileindex, '(a)')"unset key"
       write(outfileindex, '(a)')"set pointsize 0.8"

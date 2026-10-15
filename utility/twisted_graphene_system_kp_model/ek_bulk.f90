@@ -147,10 +147,10 @@ subroutine ek_bulk_line
    outfileindex= outfileindex+ 1
    if (cpuid==0) then
       open(unit=outfileindex, file='bulkek.gnu')
-      write(outfileindex, '(a)') 'set terminal pdf enhanced color font ",30" size 4, 5'
+      write(outfileindex, '(a)') 'set terminal pngcairo enhanced color font ",30" size 4in, 5in'
       write(outfileindex,'(2a)') 'set palette defined ( 0  "green", ', &
          '5 "yellow", 10 "red" )'
-      write(outfileindex, '(a)')"set output 'bulkek.pdf'"
+      write(outfileindex, '(a)')"set output 'bulkek.png'"
       write(outfileindex, '(a)')'set style data linespoints'
       write(outfileindex, '(a)')'unset ztics'
       write(outfileindex, '(a)')'unset key'

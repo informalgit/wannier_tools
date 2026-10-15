@@ -515,7 +515,7 @@ Calculation density of state for the bulk system. The typical setup in **wt.in**
     0.00  0.00  1.00   ! The third vector to define 3d k cube
    
 
-Outputs are **dos.dat** and **dos.gnu**. **dos.pdf** will be obtained with ::
+Outputs are **dos.dat** and **dos.gnu**. **dos.png** will be obtained with ::
 
    gnuplot dos.gnu
    

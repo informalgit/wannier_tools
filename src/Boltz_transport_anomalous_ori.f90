@@ -103,8 +103,8 @@
         write(etaname, '(f12.2)')Eta_Arc*1000d0/eV2Hartree
         write(ahcfilename, '(7a)')'sigma_ahc_eta', trim(adjustl(etaname)), 'meV.txt'
         open(unit=outfileindex, file='sigma_ahc.gnu')
-        write(outfileindex, '(a)') 'set terminal pdf enhanced color font ",20"'
-        write(outfileindex, '(a)')"set output 'sigma_ahc.pdf'"
+        write(outfileindex, '(a)') 'set terminal pngcairo enhanced color font ",20"'
+        write(outfileindex, '(a)')"set output 'sigma_ahc.png'"
         write(outfileindex, '(a)')'set key samplen 0.8'
         write(outfileindex, '(a)')'set ylabel offset 0.0,0'
         write(outfileindex, '(a, f10.5, a, f10.5, a)')'set xrange [', OmegaMin/eV2Hartree, ':', OmegaMax/eV2Hartree, ']'
@@ -283,8 +283,8 @@
          write(etaname, '(f12.2)')Eta_Arc*1000d0/eV2Hartree
          write(anefilename, '(7a)')'alpha_ane_eta', trim(adjustl(etaname)), 'meV.txt'
          open(unit=outfileindex, file='alpha_ane.gnu')
-         write(outfileindex, '(a)') 'set terminal pdfcairo enhanced color font ",30" size 13, 6'
-         write(outfileindex, '(a)') "set output 'ane.pdf'"
+         write(outfileindex, '(a)') 'set terminal pngcairo enhanced color font ",30" size 13in, 6in'
+         write(outfileindex, '(a)') "set output 'ane.png'"
          write(outfileindex, '(a)') 'set key outside'
          write(outfileindex, '(a)') "set palette defined (0 'red', 1 'green')"
          write(outfileindex, '(a)') 'unset colorbox'
@@ -739,8 +739,8 @@ subroutine sigma_ahc_vary_ChemicalPotential(NumOfmu, mulist, NumberofEta, eta_ar
         write(etaname, '(f12.2)')Eta_Arc*1000d0/eV2Hartree
         write(shcfilename, '(7a)')'sigma_shc_eta', trim(adjustl(etaname)), 'meV.txt'
         open(unit=outfileindex, file='sigma_shc.gnu')
-        write(outfileindex, '(a)') 'set terminal pdf enhanced color font ",20"'
-        write(outfileindex, '(a)')"set output 'sigma_shc.pdf'"
+        write(outfileindex, '(a)') 'set terminal pngcairo enhanced color font ",20"'
+        write(outfileindex, '(a)')"set output 'sigma_shc.png'"
         write(outfileindex, '(a)')'set key samplen 0.8'
         write(outfileindex, '(a)')'set ylabel offset 0.0,0'
         write(outfileindex, '(a, f10.5, a, f10.5, a)')'set xrange [', OmegaMin/eV2Hartree, ':', OmegaMax/eV2Hartree, ']'

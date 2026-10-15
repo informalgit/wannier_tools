@@ -4,6 +4,23 @@
 
 .. role:: blue
 
+**Local development** Oct 14 2026
+
+1. The ``OHC_calc`` card now also writes a gnuplot script ``atomic_orbital_moment.gnu`` next to
+   ``atomic_orbital_moment.dat``. The script renders the k-space distribution of the atom-centered
+   orbital angular momentum :math:`\langle L_z\rangle` (sum over the occupied bands, the
+   NumOccupied'th band, and the bands below the Fermi level) as three pm3d panels with a
+   symmetric color range and produces ``atomic_orbital_moment.png``.
+
+2. All gnuplot scripts written by the code save PNG instead of PDF: terminals pdf/pdfcairo are replaced
+   by pngcairo and output files *.pdf by *.png; explicit page sizes keep their inch values via the in unit.
+
+3. The ``OHC_tot_calc`` card now also writes a gnuplot script ``total_orbital_moment.gnu`` next to
+   ``total_orbital_moment.dat``. It renders the k-space distribution of the total (modern-theory)
+   orbital angular momentum :math:`\langle L_z\rangle` (sum over the occupied bands, the NumOccupied'th
+   band, and the bands below the Fermi level) with the same three-panel pm3d layout and symmetric
+   color range, and produces ``total_orbital_moment.png``.
+
 **WannierTools V2.7.0** Jul 24 2023
 
 1. Add a new function to calculate anomalous Nerest Effect (ANE).

@@ -605,9 +605,9 @@ subroutine bulk_photovoltaic
        write(outfileindex, '(a)') 'if (type eq "CI") filename = "circular_inject.dat"'
     
        write(outfileindex, '(a)') ''
-       write(outfileindex, '(a)') 'outfile = sprintf("sigma_%s_%s.pdf", type, component)'
+       write(outfileindex, '(a)') 'outfile = sprintf("sigma_%s_%s.png", type, component)'
        write(outfileindex, '(a)') ''
-       write(outfileindex, '(a)') 'set terminal pdfcairo enhanced font "Arial,30" size 6,6'
+       write(outfileindex, '(a)') 'set terminal pngcairo enhanced font "Arial,30" size 6in,6in'
        write(outfileindex, '(a)') 'set output outfile'
        write(outfileindex, '(a)') ''
        write(outfileindex, '(a)') 'set title sprintf("BPVE Conductivity (sigma-%s-%s)", type, component)'

@@ -247,8 +247,8 @@
          write(muname, '(f12.2)')mu_array(ie)/eV2Hartree
          write(sigmafilename, '(3a)')'sigma_total_mu_',trim(adjustl(muname)),'eV.dat'
          write(outfileindex, '(a)')"set encoding iso_8859_1"
-         write(outfileindex, '(a)') 'set terminal pdfcairo enhanced color font ",30" size 10, 6'
-         write(outfileindex, '(a)') "set output 'sigma.pdf'"
+         write(outfileindex, '(a)') 'set terminal pngcairo enhanced color font ",30" size 10in, 6in'
+         write(outfileindex, '(a)') "set output 'sigma.png'"
          write(outfileindex, '(a)')'set border lw 2'
          write(outfileindex, '(a)')'set autoscale fix'
          write(outfileindex, '(a)')"set ylabel '{/Symbol s}_{xx}/{/Symbol t} (({/Symbol W}*m*s)^{-1})'"

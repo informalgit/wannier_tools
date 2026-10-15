@@ -103,8 +103,8 @@
         write(etaname, '(f12.2)')Eta_Arc*1000d0/eV2Hartree
         write(ahcfilename, '(7a)')'sigma_ahc_eta', trim(adjustl(etaname)), 'meV.txt'
         open(unit=outfileindex, file='sigma_ahc.gnu')
-        write(outfileindex, '(a)') 'set terminal pdf enhanced color font ",20"'
-        write(outfileindex, '(a)')"set output 'sigma_ahc.pdf'"
+        write(outfileindex, '(a)') 'set terminal pngcairo enhanced color font ",20"'
+        write(outfileindex, '(a)')"set output 'sigma_ahc.png'"
         write(outfileindex, '(a)')'set key samplen 0.8'
         write(outfileindex, '(a)')'set ylabel offset 0.0,0'
         write(outfileindex, '(a, f10.5, a, f10.5, a)')'set xrange [', OmegaMin/eV2Hartree, ':', OmegaMax/eV2Hartree, ']'
@@ -283,8 +283,8 @@
          write(etaname, '(f12.2)')Eta_Arc*1000d0/eV2Hartree
          write(anefilename, '(7a)')'alpha_ane_eta', trim(adjustl(etaname)), 'meV.txt'
          open(unit=outfileindex, file='alpha_ane.gnu')
-         write(outfileindex, '(a)') 'set terminal pdfcairo enhanced color font ",30" size 13, 6'
-         write(outfileindex, '(a)') "set output 'ane.pdf'"
+         write(outfileindex, '(a)') 'set terminal pngcairo enhanced color font ",30" size 13in, 6in'
+         write(outfileindex, '(a)') "set output 'ane.png'"
          write(outfileindex, '(a)') 'set key outside'
          write(outfileindex, '(a)') "set palette defined (0 'red', 1 'green')"
          write(outfileindex, '(a)') 'unset colorbox'
@@ -773,8 +773,8 @@ subroutine sigma_ahc_vary_ChemicalPotential(NumOfmu, mulist, NumberofEta, eta_ar
          write(etaname, '(f12.2)')Eta_Arc*1000d0/eV2Hartree
          write(shcfilename, '(7a)')'sigma_shc_eta', trim(adjustl(etaname)), 'meV.txt'
         open(unit=outfileindex, file='sigma_shc.gnu')
-        write(outfileindex, '(a)') 'set terminal pdf enhanced color font ",20"'
-        write(outfileindex, '(a)')"set output 'sigma_shc.pdf'"
+        write(outfileindex, '(a)') 'set terminal pngcairo enhanced color font ",20"'
+        write(outfileindex, '(a)')"set output 'sigma_shc.png'"
         write(outfileindex, '(a)')'set key samplen 0.8'
         write(outfileindex, '(a)')'set ylabel offset 0.0,0'
         write(outfileindex, '(a, f10.5, a, f10.5, a)')'set xrange [', OmegaMin/eV2Hartree, ':', OmegaMax/eV2Hartree, ']'
@@ -1588,8 +1588,8 @@ subroutine sigma_ahc_vary_ChemicalPotential(NumOfmu, mulist, NumberofEta, eta_ar
         write(etaname, '(f12.2)')Eta_Arc*1000d0/eV2Hartree
         write(ohcfilename, '(7a)')'sigma_ohc_eta', trim(adjustl(etaname)), 'meV.txt'
         open(unit=outfileindex, file='sigma_ohc.gnu')
-        write(outfileindex, '(a)') 'set terminal pdf enhanced color font ",20"'
-        write(outfileindex, '(a)')"set output 'sigma_ohc.pdf'"
+        write(outfileindex, '(a)') 'set terminal pngcairo enhanced color font ",20"'
+        write(outfileindex, '(a)')"set output 'sigma_ohc.png'"
         write(outfileindex, '(a)')'set key samplen 0.8'
         write(outfileindex, '(a)')'set ylabel offset 0.0,0'
         write(outfileindex, '(a, f10.5, a, f10.5, a)')'set xrange [', OmegaMin/eV2Hartree, ':', &
@@ -1700,6 +1700,66 @@ subroutine sigma_ahc_vary_ChemicalPotential(NumOfmu, mulist, NumberofEta, eta_ar
            enddo
            write(outfileindex, *) ' '
         enddo
+        close(outfileindex)
+     endif
+
+     outfileindex= outfileindex+ 1
+     if (cpuid==0) then
+        vmax= max(abs(minval(L_atom_allk_Occ_mpi(1, 3, :))), &
+                  abs(maxval(L_atom_allk_Occ_mpi(1, 3, :))), &
+                  abs(minval(L_atom_allk_Occ_mpi(2, 3, :))), &
+                  abs(maxval(L_atom_allk_Occ_mpi(2, 3, :))), &
+                  abs(minval(L_atom_allk_EF_mpi(1, 3, :))), &
+                  abs(maxval(L_atom_allk_EF_mpi(1, 3, :))))
+        if (vmax<eps9) vmax= 1d0
+        open(unit=outfileindex, file='atomic_orbital_moment.gnu')
+        write(outfileindex, '(a)')"set encoding iso_8859_1"
+        write(outfileindex, '(a)')'set terminal pngcairo truecolor enhanced size 3680, 1920 font ",40"'
+        write(outfileindex, '(a)')"set output 'atomic_orbital_moment.png'"
+        write(outfileindex, '(a)')'if (!exists("MP_LEFT"))   MP_LEFT = .12'
+        write(outfileindex, '(a)')'if (!exists("MP_RIGHT"))  MP_RIGHT = .92'
+        write(outfileindex, '(a)')'if (!exists("MP_BOTTOM")) MP_BOTTOM = .12'
+        write(outfileindex, '(a)')'if (!exists("MP_TOP"))    MP_TOP = .88'
+        write(outfileindex, '(a)')'if (!exists("MP_GAP"))    MP_GAP = 0.08'
+        write(outfileindex, '(a)')'set multiplot layout 1,3 rowsfirst \'
+        write(outfileindex, '(a)')'              margins screen MP_LEFT, MP_RIGHT, MP_BOTTOM, MP_TOP spacing screen MP_GAP'
+        write(outfileindex, '(a)')'set palette defined (-500 "#0290b4", 0 "white", 500 "#ed1651")'
+        write(outfileindex, '(a)')"unset ztics"
+        write(outfileindex, '(a)')"unset key"
+        write(outfileindex, '(a)')"set pm3d"
+        write(outfileindex, '(a, E10.3, a, E10.3, a)')"set cbrange [ -", vmax, " : ", vmax, " ]"
+        write(outfileindex, '(a)')"set view map"
+        write(outfileindex, '(a)')"set size ratio -1"
+        write(outfileindex, '(a)')"set border lw 3"
+        write(outfileindex, '(a)')"set xlabel 'k (1/{\305})'"
+        write(outfileindex, '(a)')"set ylabel 'k (1/{\305})'"
+        write(outfileindex, '(a)')"set xrange [] noextend"
+        write(outfileindex, '(a)')"set yrange [] noextend"
+        write(outfileindex, '(a)')"set ytics 0.5 nomirror scale 0.5"
+        write(outfileindex, '(a)')"set pm3d interpolate 2,2"
+        write(outfileindex, '(a)')"set colorbox"
+        write(outfileindex, '(a)')"stats 'atomic_orbital_moment.dat' u 1:2 nooutput"
+        write(outfileindex, '(a)')"xmin = STATS_min_x"
+        write(outfileindex, '(a)')"xmax = STATS_max_x"
+        write(outfileindex, '(a)')"ymin = STATS_min_y"
+        write(outfileindex, '(a)')"ymax = STATS_max_y"
+        write(outfileindex, '(a)')"set title '⟨L_z^{ACA}⟩'"
+        write(outfileindex, '(a)')"splot 'atomic_orbital_moment.dat' u ($1):($2):9 w pm3d, \"
+        write(outfileindex, '(a)')"      '' u ($1 + (xmax - xmin)):($2 + (ymax - ymin)*1/3):9 w pm3d, \"
+        write(outfileindex, '(a)')"      '' u ($1):($2 + (ymax - ymin)*2/3):9 w pm3d, \"
+        write(outfileindex, '(a)')"      '' u ($1 + (xmax - xmin)):($2 + (ymax - ymin)):9 w pm3d"
+        write(outfileindex, '(a)')' '
+        write(outfileindex, '(a)')"set title '⟨L_z^{ACA,nocc}⟩'"
+        write(outfileindex, '(a)')"splot 'atomic_orbital_moment.dat' u ($1):($2):12 w pm3d, \"
+        write(outfileindex, '(a)')"      '' u ($1 + (xmax - xmin)):($2 + (ymax - ymin)*1/3):12 w pm3d, \"
+        write(outfileindex, '(a)')"      '' u ($1):($2 + (ymax - ymin)*2/3):12 w pm3d, \"
+        write(outfileindex, '(a)')"      '' u ($1 + (xmax - xmin)):($2 + (ymax - ymin)):12 w pm3d"
+        write(outfileindex, '(a)')' '
+        write(outfileindex, '(a)')"set title '⟨L_z^{ACA,E_FM}⟩'"
+        write(outfileindex, '(a)')"splot 'atomic_orbital_moment.dat' u ($1):($2):15 w pm3d, \"
+        write(outfileindex, '(a)')"      '' u ($1 + (xmax - xmin)):($2 + (ymax - ymin)*1/3):15 w pm3d, \"
+        write(outfileindex, '(a)')"      '' u ($1):($2 + (ymax - ymin)*2/3):15 w pm3d, \"
+        write(outfileindex, '(a)')"      '' u ($1 + (xmax - xmin)):($2 + (ymax - ymin)):15 w pm3d"
         close(outfileindex)
      endif
 
@@ -2183,8 +2243,8 @@ subroutine sigma_ahc_vary_ChemicalPotential(NumOfmu, mulist, NumberofEta, eta_ar
         write(etaname, '(f12.2)')Eta_Arc*1000d0/eV2Hartree
         write(ohcfilename, '(7a)')'sigma_ohc_tot_eta', trim(adjustl(etaname)), 'meV.txt'
         open(unit=outfileindex, file='sigma_ohc_tot.gnu')
-        write(outfileindex, '(a)') 'set terminal pdf enhanced color font ",20"'
-        write(outfileindex, '(a)')"set output 'sigma_ohc_tot.pdf'"
+        write(outfileindex, '(a)') 'set terminal pngcairo enhanced color font ",20"'
+        write(outfileindex, '(a)')"set output 'sigma_ohc_tot.png'"
         write(outfileindex, '(a)')'set key samplen 0.8'
         write(outfileindex, '(a)')'set ylabel offset 0.0,0'
         write(outfileindex, '(a, f10.5, a, f10.5, a)')'set xrange [', OmegaMin/eV2Hartree, ':', &
@@ -2310,6 +2370,66 @@ subroutine sigma_ahc_vary_ChemicalPotential(NumOfmu, mulist, NumberofEta, eta_ar
 
      outfileindex= outfileindex+ 1
      if (cpuid==0) then
+        vmax= max(abs(minval(L_tot_allk_Occ_mpi(1, 3, :))), &
+                  abs(maxval(L_tot_allk_Occ_mpi(1, 3, :))), &
+                  abs(minval(L_tot_allk_Occ_mpi(2, 3, :))), &
+                  abs(maxval(L_tot_allk_Occ_mpi(2, 3, :))), &
+                  abs(minval(L_tot_allk_EF_mpi(1, 3, :))), &
+                  abs(maxval(L_tot_allk_EF_mpi(1, 3, :))))
+        if (vmax<eps9) vmax= 1d0
+        open(unit=outfileindex, file='total_orbital_moment.gnu')
+        write(outfileindex, '(a)')"set encoding iso_8859_1"
+        write(outfileindex, '(a)')'set terminal pngcairo truecolor enhanced size 3680, 1920 font ",40"'
+        write(outfileindex, '(a)')"set output 'total_orbital_moment.png'"
+        write(outfileindex, '(a)')'if (!exists("MP_LEFT"))   MP_LEFT = .12'
+        write(outfileindex, '(a)')'if (!exists("MP_RIGHT"))  MP_RIGHT = .92'
+        write(outfileindex, '(a)')'if (!exists("MP_BOTTOM")) MP_BOTTOM = .12'
+        write(outfileindex, '(a)')'if (!exists("MP_TOP"))    MP_TOP = .88'
+        write(outfileindex, '(a)')'if (!exists("MP_GAP"))    MP_GAP = 0.08'
+        write(outfileindex, '(a)')'set multiplot layout 1,3 rowsfirst \'
+        write(outfileindex, '(a)')'              margins screen MP_LEFT, MP_RIGHT, MP_BOTTOM, MP_TOP spacing screen MP_GAP'
+        write(outfileindex, '(a)')'set palette defined (-500 "#0290b4", 0 "white", 500 "#ed1651")'
+        write(outfileindex, '(a)')"unset ztics"
+        write(outfileindex, '(a)')"unset key"
+        write(outfileindex, '(a)')"set pm3d"
+        write(outfileindex, '(a, E10.3, a, E10.3, a)')"set cbrange [ -", vmax, " : ", vmax, " ]"
+        write(outfileindex, '(a)')"set view map"
+        write(outfileindex, '(a)')"set size ratio -1"
+        write(outfileindex, '(a)')"set border lw 3"
+        write(outfileindex, '(a)')"set xlabel 'k (1/{\305})'"
+        write(outfileindex, '(a)')"set ylabel 'k (1/{\305})'"
+        write(outfileindex, '(a)')"set xrange [] noextend"
+        write(outfileindex, '(a)')"set yrange [] noextend"
+        write(outfileindex, '(a)')"set ytics 0.5 nomirror scale 0.5"
+        write(outfileindex, '(a)')"set pm3d interpolate 2,2"
+        write(outfileindex, '(a)')"set colorbox"
+        write(outfileindex, '(a)')"stats 'total_orbital_moment.dat' u 1:2 nooutput"
+        write(outfileindex, '(a)')"xmin = STATS_min_x"
+        write(outfileindex, '(a)')"xmax = STATS_max_x"
+        write(outfileindex, '(a)')"ymin = STATS_min_y"
+        write(outfileindex, '(a)')"ymax = STATS_max_y"
+        write(outfileindex, '(a)')"set title '⟨L_z^{tot}⟩'"
+        write(outfileindex, '(a)')"splot 'total_orbital_moment.dat' u ($1):($2):9 w pm3d, \"
+        write(outfileindex, '(a)')"      '' u ($1 + (xmax - xmin)):($2 + (ymax - ymin)*1/3):9 w pm3d, \"
+        write(outfileindex, '(a)')"      '' u ($1):($2 + (ymax - ymin)*2/3):9 w pm3d, \"
+        write(outfileindex, '(a)')"      '' u ($1 + (xmax - xmin)):($2 + (ymax - ymin)):9 w pm3d"
+        write(outfileindex, '(a)')' '
+        write(outfileindex, '(a)')"set title '⟨L_z^{tot,nocc}⟩'"
+        write(outfileindex, '(a)')"splot 'total_orbital_moment.dat' u ($1):($2):12 w pm3d, \"
+        write(outfileindex, '(a)')"      '' u ($1 + (xmax - xmin)):($2 + (ymax - ymin)*1/3):12 w pm3d, \"
+        write(outfileindex, '(a)')"      '' u ($1):($2 + (ymax - ymin)*2/3):12 w pm3d, \"
+        write(outfileindex, '(a)')"      '' u ($1 + (xmax - xmin)):($2 + (ymax - ymin)):12 w pm3d"
+        write(outfileindex, '(a)')' '
+        write(outfileindex, '(a)')"set title '⟨L_z^{tot,E_FM}⟩'"
+        write(outfileindex, '(a)')"splot 'total_orbital_moment.dat' u ($1):($2):15 w pm3d, \"
+        write(outfileindex, '(a)')"      '' u ($1 + (xmax - xmin)):($2 + (ymax - ymin)*1/3):15 w pm3d, \"
+        write(outfileindex, '(a)')"      '' u ($1):($2 + (ymax - ymin)*2/3):15 w pm3d, \"
+        write(outfileindex, '(a)')"      '' u ($1 + (xmax - xmin)):($2 + (ymax - ymin)):15 w pm3d"
+        close(outfileindex)
+     endif
+
+     outfileindex= outfileindex+ 1
+     if (cpuid==0) then
         open(unit=outfileindex, file='ohc_tot_berrycurvature_xy_z.dat')
         write(outfileindex, '(a)')'# Total orbital Berry curvature for sigma_xy^z, unit: Angstrom^2'
         write(outfileindex, '(a)')'# Modern theory of orbital magnetization, PRB 106, 104414 (2022)'
@@ -2379,7 +2499,7 @@ subroutine sigma_ahc_vary_ChemicalPotential(NumOfmu, mulist, NumberofEta, eta_ar
    !> Output:                                                       !
    !>   orbital_moment_kpath.dat                                    !
    !>   orbital_moment_kpath.gnu                                    !
-   !>   orbital_moment_kpath.pdf (after running gnuplot)             !
+   !>   orbital_moment_kpath.png (after running gnuplot)             !
    !------------------------------------------------------------------!
      use wmpi
      use para
@@ -2525,9 +2645,9 @@ subroutine sigma_ahc_vary_ChemicalPotential(NumOfmu, mulist, NumberofEta, eta_ar
      if (cpuid==0) then
         open(unit=outfileindex, file='orbital_moment_kpath.gnu')
         write(outfileindex, '(a)') &
-           'set terminal pdfcairo enhanced color font ",18" size 8,8'
+           'set terminal pngcairo enhanced color font ",18" size 8in,8in'
         write(outfileindex, '(a)') &
-           "set output 'orbital_moment_kpath.pdf'"
+           "set output 'orbital_moment_kpath.png'"
         write(outfileindex, '(a,f14.7,a)') &
            'set xrange [0:', maxval(k3len)*Angstrom2atomic, ']'
         write(outfileindex, '(a)', advance='no')'set xtics ('

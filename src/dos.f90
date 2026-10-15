@@ -156,8 +156,8 @@ subroutine dos_sparse
    if (cpuid==0) then
       open(unit=outfileindex, file='dos.gnu')
       write(outfileindex, '(a)')"set encoding iso_8859_1"
-      write(outfileindex, '(a)')'set terminal  pdf enhanced color font ",14" '
-      write(outfileindex, '(a)')"set output 'dos.pdf'"
+      write(outfileindex, '(a)')'set terminal  pngcairo enhanced color font ",14" '
+      write(outfileindex, '(a)')"set output 'dos.png'"
       write(outfileindex, '(a)')'set border lw 2'
       write(outfileindex, '(a)')'set autoscale fix'
       write(outfileindex, '(a, f16.6,a)')'set yrange [0:', maxval(dos)*eV2Hartree+0.5, '1]'
